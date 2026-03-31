@@ -42,6 +42,34 @@ python -m myskills --help
 
 ### Skill Management Commands
 
+#### List available skills
+
+```bash
+# List all skills in the repository
+myskills list
+
+# List with verbose output
+myskills -v list
+```
+
+**Exit codes:**
+- `0` - Success
+- `3` - Repository unreachable
+
+**Example:**
+```bash
+myskills list
+
+# Output:
+# Available skills (3 total):
+# 
+#   find-skills          v1.0.0    [installed]  Helps discover and install agent skills
+#   code-review          v2.1.0    [installed]  Reviews code for best practices
+#   test-generator       v1.3.0                 Generates test scaffolds from code
+# 
+# Installed: 2/3
+```
+
 #### Install a skill from the repository
 
 ```bash
@@ -102,7 +130,7 @@ myskills add find-skills
 # Installed find-skills (v1.0.0) for claude, windsurf
 ```
 
-> **Status**: `add` command is fully functional (MVP). Additional commands (`list`, `remove`, `update`, `import`) are planned for future releases.
+> **Status**: `add` and `list` commands are fully functional. Additional commands (`remove`, `update`, `import`) are planned for future releases.
 
 ### Running tests
 

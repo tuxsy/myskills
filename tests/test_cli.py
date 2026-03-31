@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 from click.testing import CliRunner
@@ -310,3 +310,191 @@ class TestAddCommand:
 
         # Assert: Exit code 130 (keyboard interrupt)
         assert result.exit_code == 130, f"Output: {result.output}"
+
+
+class TestListCommand:
+    """Tests for the 'list' CLI command (T025)."""
+
+    def test_list_command_happy_path(
+        self,
+        tmp_project: Path,
+        cli_runner: CliRunner,
+    ) -> None:
+        """List command displays all available skills with installation status."""
+        # Arrange
+        project = ProjectContext(root=tmp_project)
+        config = {
+            "version": CONFIG_VERSION,
+            "repository": "git@github.com:org/repo.git",
+            "installations": {},
+        }
+        write_config(project.config_path, config)
+
+        # Mock list_skills to return sample skills
+        mock_skills = [
+            {
+                "name": "skill-a",
+                "description": "First test skill",
+                "version": "1.0.0",
+                "installed": True,
+            },
+            {
+                "name": "skill-b",
+                "description": "Second test skill",
+                "version": "2.1.0",
+                "installed": False,
+            },
+            {
+                "name": "skill-c",
+                "description": "Third test skill",
+                "version": "1.5.0",
+                "installed": True,
+            },
+        ]
+
+        with patch("myskills.cli.list_skills") as mock_list:
+            mock_list.return_value = mock_skills
+
+            # Act
+            original_cwd = os.getcwd()
+            try:
+                os.chdir(tmp_project)
+                result = cli_runner.invoke(main, ["list"])
+            finally:
+                os.chdir(original_cwd)
+
+        # Assert: Command succeeds
+        assert result.exit_code == 0, f"Output: {result.output}\nException: {result.exception}"
+
+        # Check output format
+        assert "skill-a" in result.output
+        assert "skill-b" in result.output
+        assert "skill-c" in result.output
+        assert "1.0.0" in result.output
+        assert "2.1.0" in result.output
+        assert "[installed]" in result.output
+        assert "Installed: 2/3" in result.output or "2/3" in result.output
+
+    def test_list_command_empty_repository(
+        self,
+        tmp_project: Path,
+        cli_runner: CliRunner,
+    ) -> None:
+        """List command handles empty repository gracefully."""
+        # Arrange
+        project = ProjectContext(root=tmp_project)
+        config = {
+            "version": CONFIG_VERSION,
+            "repository": "git@github.com:org/repo.git",
+            "installations": {},
+        }
+        write_config(project.config_path, config)
+
+        # Mock list_skills to return empty list
+        with patch("myskills.cli.list_skills") as mock_list:
+            mock_list.return_value = []
+
+            # Act
+            original_cwd = os.getcwd()
+            try:
+                os.chdir(tmp_project)
+                result = cli_runner.invoke(main, ["list"])
+            finally:
+                os.chdir(original_cwd)
+
+        # Assert: Command succeeds with appropriate message
+        assert result.exit_code == 0, f"Output: {result.output}"
+        assert "no skills" in result.output.lower() or "0 total" in result.output.lower()
+
+    def test_list_command_repo_unreachable(
+        self,
+        tmp_project: Path,
+        cli_runner: CliRunner,
+    ) -> None:
+        """List command exits with code 3 when repository is unreachable."""
+        # Arrange
+        project = ProjectContext(root=tmp_project)
+        config = {
+            "version": CONFIG_VERSION,
+            "repository": "git@github.com:org/unreachable.git",
+            "installations": {},
+        }
+        write_config(project.config_path, config)
+
+        # Mock list_skills to raise GitError
+        from myskills.git_ops import GitError
+
+        with patch("myskills.cli.list_skills") as mock_list:
+            mock_list.side_effect = GitError("Network error: repository unreachable")
+
+            # Act
+            original_cwd = os.getcwd()
+            try:
+                os.chdir(tmp_project)
+                result = cli_runner.invoke(main, ["list"])
+            finally:
+                os.chdir(original_cwd)
+
+        # Assert: Exit code 3 (repository unreachable)
+        assert result.exit_code == 3, f"Output: {result.output}"
+        assert "repository" in result.output.lower() or "network" in result.output.lower()
+
+    def test_list_command_verbose_output(
+        self,
+        tmp_project: Path,
+        cli_runner: CliRunner,
+    ) -> None:
+        """List command with --verbose flag shows detailed operation output."""
+        # Arrange
+        project = ProjectContext(root=tmp_project)
+        config = {
+            "version": CONFIG_VERSION,
+            "repository": "git@github.com:org/repo.git",
+            "installations": {},
+        }
+        write_config(project.config_path, config)
+
+        mock_skills = [
+            {
+                "name": "test-skill",
+                "description": "A test skill",
+                "version": "1.0.0",
+                "installed": False,
+            },
+        ]
+
+        with patch("myskills.cli.list_skills") as mock_list:
+            mock_list.return_value = mock_skills
+
+            # Act
+            original_cwd = os.getcwd()
+            try:
+                os.chdir(tmp_project)
+                result = cli_runner.invoke(main, ["--verbose", "list"])
+            finally:
+                os.chdir(original_cwd)
+
+        # Assert: Command succeeds
+        assert result.exit_code == 0, f"Output: {result.output}"
+        assert mock_list.called
+
+    def test_list_command_outside_project(
+        self,
+        tmp_path: Path,
+        cli_runner: CliRunner,
+    ) -> None:
+        """List command fails gracefully outside a project directory."""
+        # Act: Run list from a directory without .myskills.json
+        original_cwd = os.getcwd()
+        try:
+            # Create a directory with no git marker or config
+            non_project = tmp_path / "non-project"
+            non_project.mkdir()
+            os.chdir(non_project)
+            result = cli_runner.invoke(main, ["list"])
+        finally:
+            os.chdir(original_cwd)
+
+        # Assert: Should fail with project context error
+        assert result.exit_code in [1, 2], f"Output: {result.output}"
+        # The error message should indicate project detection issue

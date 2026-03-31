@@ -89,13 +89,13 @@
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T024 [P] [US2] Write tests for list skill logic (skills available, some installed, empty repo, repo unreachable) in `tests/test_list.py`
-- [ ] T025 [P] [US2] Write CLI tests for `list` command (CliRunner output format verification) in `tests/test_cli.py` (list command section)
+- [X] T024 [P] [US2] Write tests for list skill logic (skills available, some installed, empty repo, repo unreachable) in `tests/test_list.py`
+- [X] T025 [P] [US2] Write CLI tests for `list` command (CliRunner output format verification) in `tests/test_cli.py` (list command section)
 
 ### Implementation for User Story 2
 
-- [ ] T026 [US2] Implement skill listing logic (sync repo, read all skills from repo, cross-reference with installed config, format output) in `src/myskills/skill_ops.py` (`list_skills` function)
-- [ ] T027 [US2] Implement `list` CLI command with exit codes (0/3) and formatted table output in `src/myskills/cli.py` per cli-contract.md list command flow
+- [X] T026 [US2] Implement skill listing logic (sync repo, read all skills from repo, cross-reference with installed config, format output) in `src/myskills/skill_ops.py` (`list_skills` function)
+- [X] T027 [US2] Implement `list` CLI command with exit codes (0/3) and formatted table output in `src/myskills/cli.py` per cli-contract.md list command flow
 
 **Checkpoint**: User Story 2 fully functional. `./myskills list` displays all skills with installation status.
 

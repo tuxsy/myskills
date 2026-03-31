@@ -6,13 +6,13 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
-from myskills.agents import SUPPORTED_AGENTS, get_agent_by_id
+from myskills.agents import SUPPORTED_AGENTS
 from myskills.config import CONFIG_VERSION, read_config, write_config
 from myskills.git_ops import GitError, clone_repository, pull_repository
 from myskills.manifest import ManifestError, parse_manifest
 from myskills.models import ProjectContext, Skill, SkillsRepository
 from myskills.rollback import UndoStack
-from myskills.symlinks import create_skill_symlinks, remove_skill_symlinks
+from myskills.symlinks import create_skill_symlinks
 from myskills.ui import UIProvider
 
 
@@ -309,3 +309,96 @@ def install_skill(
     # 11. Display success message
     agent_names = ", ".join(agent.id for agent in selected_agents)
     ui.success(f"Installed {skill_name} (v{skill.version}) for {agent_names}")
+
+
+def list_skills(
+    project: ProjectContext,
+    repo: SkillsRepository,
+    ui: UIProvider,
+) -> list[dict]:
+    """List all available skills in the repository with installation status.
+
+    Flow:
+    1. Validate project context
+    2. Sync repository
+    3. Read all skills from repository
+    4. Cross-reference with installed config
+    5. Return list of skill dictionaries
+
+    Args:
+        project: ProjectContext instance.
+        repo: SkillsRepository instance.
+        ui: UI provider for user feedback.
+
+    Returns:
+        List of skill dictionaries with keys: name, description, version, installed.
+        Sorted alphabetically by name.
+
+    Raises:
+        GitError: If repository sync fails.
+    """
+    # 1. Validate project context
+    if not project.root.exists():
+        raise SkillOperationError(f"Project root '{project.root}' does not exist.")
+
+    # 2. Sync repository
+    try:
+        sync_repository(repo, ui)
+    except GitError as e:
+        ui.error(f"Failed to sync repository: {e}")
+        raise
+
+    # 3. Read all skills from repository
+    skills = []
+
+    # Get list of all directories in the repository
+    if not repo.local_cache.exists():
+        ui.warning("Repository cache does not exist")
+        return []
+
+    for item in repo.local_cache.iterdir():
+        # Skip non-directories and hidden files
+        if not item.is_dir() or item.name.startswith("."):
+            continue
+
+        # Try to parse manifest
+        try:
+            manifest = parse_manifest(item)
+            skills.append(
+                {
+                    "name": manifest.name,
+                    "description": manifest.description,
+                    "version": manifest.version,
+                    "path": item,
+                }
+            )
+        except ManifestError as e:
+            ui.warning(f"Skipping invalid skill '{item.name}': {e}")
+            ui.verbose(f"Invalid manifest at {item}")
+            continue
+
+    # 4. Cross-reference with installed config
+    installed_skills = set()
+    if project.config_path.exists():
+        config = read_config(project.config_path)
+        installed_skills = set(config.get("installations", {}).keys())
+
+    # 5. Build result list with installation status
+    result = []
+    for skill in skills:
+        result.append(
+            {
+                "name": skill["name"],
+                "description": skill["description"],
+                "version": skill["version"],
+                "installed": skill["name"] in installed_skills,
+            }
+        )
+
+    # Sort by name
+    result.sort(key=lambda s: s["name"])
+
+    ui.verbose(f"Found {len(result)} skills in repository")
+    ui.verbose(f"Installed: {len(installed_skills)}/{len(result)}")
+
+    return result
