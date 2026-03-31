@@ -77,6 +77,8 @@ select = [
 ]
 ignore = [
     "E501",  # line length handled by formatter
+    "TC001", # move app import into TYPE_CHECKING — false positives with runtime usage
+    "TC003", # move stdlib import into TYPE_CHECKING — false positives with runtime usage
 ]
 
 [tool.ruff.lint.isort]

@@ -37,20 +37,20 @@
 
 **CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T005 Implement data models (Skill, SkillManifest, Agent, SkillInstallation, SkillsRepository, ProjectContext) in `src/myskills/models.py` per data-model.md with frozen dataclasses, validation properties, and SUPPORTED_AGENTS list
-- [ ] T006 [P] Implement hardcoded agent definitions (claude, cursor, copilot, windsurf) with display names and skills_dir paths in `src/myskills/agents.py` per data-model.md and R-006
-- [ ] T007 [P] Implement SKILL.md YAML front-matter parser and validator in `src/myskills/manifest.py` per config-contract.md validation rules (name regex, semver, directory match, required fields) using pyyaml
-- [ ] T008 [P] Implement project context detection and validation (find project root, verify not outside project) in `src/myskills/project.py` per FR-012
-- [ ] T009 [P] Implement `.myskills.json` config read/write with atomic file operations (write-to-temp-then-rename) in `src/myskills/config.py` per config-contract.md schema
-- [ ] T010 [P] Implement Git operations (clone, pull, sync, credential resolution with SSH/HTTPS/fallback) via dulwich in `src/myskills/git_ops.py` per R-002 credential strategy
-- [ ] T011 [P] Implement symlink creation, removal, and dangling symlink detection in `src/myskills/symlinks.py` per FR-004, FR-006, FR-013
-- [ ] T012 [P] Implement terminal UI abstraction (agent multi-select via simple-term-menu, confirmation prompts, colored output, verbose logging) in `src/myskills/ui.py` per R-003 with injectable interface for testing
-- [ ] T013 [P] Implement atomic operation undo stack (register steps with undo actions, execute with rollback on failure) in `src/myskills/rollback.py` per FR-010, SC-006
-- [ ] T014 Create Click CLI skeleton with group command, global `--verbose` and `--version` options in `src/myskills/cli.py` per cli-contract.md global options
-- [ ] T015 [P] Create shared test fixtures (tmp project dirs, fake git repos, FakeUI, skill directory factories) in `tests/conftest.py` per R-004 testability decisions
-- [ ] T016 [P] Write unit tests for manifest parsing (valid/invalid YAML, missing fields, name mismatch, invalid version) in `tests/test_manifest.py`
-- [ ] T017 [P] Write unit tests for symlink operations (create, remove, detect dangling) in `tests/test_symlinks.py`
-- [ ] T018 [P] Write unit tests for rollback mechanism (success path, failure-and-rollback, nested operations) in `tests/test_rollback.py`
+- [X] T005 Implement data models (Skill, SkillManifest, Agent, SkillInstallation, SkillsRepository, ProjectContext) in `src/myskills/models.py` per data-model.md with frozen dataclasses, validation properties, and SUPPORTED_AGENTS list
+- [X] T006 [P] Implement hardcoded agent definitions (claude, cursor, copilot, windsurf) with display names and skills_dir paths in `src/myskills/agents.py` per data-model.md and R-006
+- [X] T007 [P] Implement SKILL.md YAML front-matter parser and validator in `src/myskills/manifest.py` per config-contract.md validation rules (name regex, semver, directory match, required fields) using pyyaml
+- [X] T008 [P] Implement project context detection and validation (find project root, verify not outside project) in `src/myskills/project.py` per FR-012
+- [X] T009 [P] Implement `.myskills.json` config read/write with atomic file operations (write-to-temp-then-rename) in `src/myskills/config.py` per config-contract.md schema
+- [X] T010 [P] Implement Git operations (clone, pull, sync, credential resolution with SSH/HTTPS/fallback) via dulwich in `src/myskills/git_ops.py` per R-002 credential strategy
+- [X] T011 [P] Implement symlink creation, removal, and dangling symlink detection in `src/myskills/symlinks.py` per FR-004, FR-006, FR-013
+- [X] T012 [P] Implement terminal UI abstraction (agent multi-select via simple-term-menu, confirmation prompts, colored output, verbose logging) in `src/myskills/ui.py` per R-003 with injectable interface for testing
+- [X] T013 [P] Implement atomic operation undo stack (register steps with undo actions, execute with rollback on failure) in `src/myskills/rollback.py` per FR-010, SC-006
+- [X] T014 Create Click CLI skeleton with group command, global `--verbose` and `--version` options in `src/myskills/cli.py` per cli-contract.md global options
+- [X] T015 [P] Create shared test fixtures (tmp project dirs, fake git repos, FakeUI, skill directory factories) in `tests/conftest.py` per R-004 testability decisions
+- [X] T016 [P] Write unit tests for manifest parsing (valid/invalid YAML, missing fields, name mismatch, invalid version) in `tests/test_manifest.py`
+- [X] T017 [P] Write unit tests for symlink operations (create, remove, detect dangling) in `tests/test_symlinks.py`
+- [X] T018 [P] Write unit tests for rollback mechanism (success path, failure-and-rollback, nested operations) in `tests/test_rollback.py`
 
 **Checkpoint**: Foundation ready - all shared modules implemented and tested. User story implementation can begin.
 
