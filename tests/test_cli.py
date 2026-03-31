@@ -372,7 +372,7 @@ class TestListCommand:
         assert "skill-c" in result.output
         assert "1.0.0" in result.output
         assert "2.1.0" in result.output
-        assert "[installed]" in result.output
+        assert "installed" in result.output  # Check for installed marker (✓ installed)
         assert "Installed: 2/3" in result.output or "2/3" in result.output
 
     def test_list_command_empty_repository(

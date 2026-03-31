@@ -63,12 +63,23 @@ myskills list
 # Output:
 # Available skills (3 total):
 # 
-#   find-skills          v1.0.0    [installed]  Helps discover and install agent skills
-#   code-review          v2.1.0    [installed]  Reviews code for best practices
-#   test-generator       v1.3.0                 Generates test scaffolds from code
+#   find-skills              v1.0.0    Helps discover and install agent skills
+#                                      [✓ installed]
+# 
+#   code-review              v2.1.0    Reviews code for best practices and
+#                                      suggests improvements
+#                                      [✓ installed]
+# 
+#   test-generator           v1.3.0    Generates test scaffolds from code
 # 
 # Installed: 2/3
 ```
+
+**Note:** The output uses ANSI color codes for better readability:
+- Skill names appear in **bold**
+- Versions appear in *italic*
+- Installed markers appear in green
+- Long descriptions automatically wrap and align
 
 #### Install a skill from the repository
 

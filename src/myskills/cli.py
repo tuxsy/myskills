@@ -1,6 +1,7 @@
 """MySkills CLI entry point."""
 
 import sys
+import textwrap
 from pathlib import Path
 
 import click
@@ -179,13 +180,68 @@ def list(ctx: click.Context) -> None:
             installed_count = sum(1 for s in skills if s["installed"])
             ui.info(f"Available skills ({len(skills)} total):\n")
 
+            # Calculate column widths for tabular format
+            # We'll use fixed widths: name (25), version (10), then description fills the rest
+            name_width = 25
+            version_width = 10
+
+            # Get terminal width, default to 80 if not available
+            import shutil
+
+            terminal_width = shutil.get_terminal_size(fallback=(80, 24)).columns
+
+            # Calculate available width for description (accounting for indent and spacing)
+            # Format: "  name           version     description..."
+            indent = 2
+            description_start = indent + name_width + version_width
+            description_width = max(
+                40, terminal_width - description_start - 5
+            )  # -5 for safety margin
+
             for skill in skills:
-                installed_marker = "  [installed]" if skill["installed"] else ""
-                ui.info(
-                    f"  {skill['name']:<20} v{skill['version']:<8} {installed_marker:<15} {skill['description']}"
+                # Format with ANSI codes: bold name, italic version
+                name_display = f"\033[1m{skill['name']}\033[0m"  # Bold
+                version_display = f"\033[3mv{skill['version']}\033[0m"  # Italic
+
+                # Pad name and version for alignment (accounting for ANSI codes)
+                # ANSI codes add 9 characters (\033[1m and \033[0m) but don't display
+                # Ensure at least 1 space between name and version
+                name_padding = max(1, name_width - len(skill["name"]))
+                version_padding = max(1, version_width - len(skill["version"]) - 1)  # -1 for 'v'
+
+                # Build the first line with name and version
+                first_line = (
+                    f"  {name_display}{' ' * name_padding}{version_display}{' ' * version_padding}"
                 )
 
-            ui.info(f"\nInstalled: {installed_count}/{len(skills)}")
+                # Wrap the description to fit in the remaining space
+                wrapped_lines = textwrap.wrap(
+                    skill["description"],
+                    width=description_width,
+                    break_long_words=False,
+                    break_on_hyphens=False,
+                )
+
+                if wrapped_lines:
+                    # First line: name, version, and first part of description
+                    first_line += wrapped_lines[0]
+                    ui.info(first_line)
+
+                    # Subsequent lines: indented to align with description start
+                    continuation_indent = " " * description_start
+                    for line in wrapped_lines[1:]:
+                        ui.info(continuation_indent + line)
+
+                    # Add installed marker on a separate indented line if installed
+                    if skill["installed"]:
+                        marker = "\033[32m✓ installed\033[0m"
+                        ui.info(continuation_indent + f"[{marker}]")
+                else:
+                    ui.info(first_line)
+
+                ui.info("")  # Blank line between skills
+
+            ui.info(f"Installed: {installed_count}/{len(skills)}")
 
     except ProjectError as e:
         ui.error(str(e))
