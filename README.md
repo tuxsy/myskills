@@ -2,6 +2,12 @@
 
 CLI tool to manage AI agent skills from a private Git repository. Install, uninstall, list, update, and import skills for AI coding assistants (Claude, Cursor, Copilot, Windsurf) using a single self-contained executable.
 
+## Requirements
+
+- **Python 3.11+**
+- **pip** (included with Python)
+- **Git** (for cloning the repository)
+
 ## Quick Start
 
 ```bash
