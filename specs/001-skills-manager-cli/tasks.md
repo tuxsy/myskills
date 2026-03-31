@@ -66,14 +66,14 @@
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T019 [P] [US1] Write tests for add skill logic (happy path, already installed, skill not found, repo unreachable) in `tests/test_add.py`
-- [ ] T020 [P] [US1] Write CLI tests for `add` command (CliRunner with input simulation for agent selection and confirmation) in `tests/test_cli.py` (add command section)
+- [X] T019 [P] [US1] Write tests for add skill logic (happy path, already installed, skill not found, repo unreachable) in `tests/test_add.py`
+- [X] T020 [P] [US1] Write CLI tests for `add` command (CliRunner with input simulation for agent selection and confirmation) in `tests/test_cli.py` (add command section)
 
 ### Implementation for User Story 1
 
-- [ ] T021 [US1] Implement skill install orchestration (validate project, sync repo, check manifest, check already-installed, agent selection, summary display, confirm, copy files, create symlinks, update config) in `src/myskills/skill_ops.py` (`install_skill` function)
-- [ ] T022 [US1] Implement `add` CLI command with skill_name argument, exit codes (0/1/2/3/130), and verbose output in `src/myskills/cli.py` per cli-contract.md add command flow
-- [ ] T023 [US1] Add error handling for add operation: permission errors, filesystem failures, interrupted operations with rollback in `src/myskills/skill_ops.py`
+- [X] T021 [US1] Implement skill install orchestration (validate project, sync repo, check manifest, check already-installed, agent selection, summary display, confirm, copy files, create symlinks, update config) in `src/myskills/skill_ops.py` (`install_skill` function)
+- [X] T022 [US1] Implement `add` CLI command with skill_name argument, exit codes (0/1/2/3/130), and verbose output in `src/myskills/cli.py` per cli-contract.md add command flow
+- [X] T023 [US1] Add error handling for add operation: permission errors, filesystem failures, interrupted operations with rollback in `src/myskills/skill_ops.py`
 
 **Checkpoint**: User Story 1 fully functional. `./myskills add <skill_name>` works end-to-end with agent selection, confirmation, file copy, symlinks, and rollback on failure.
 

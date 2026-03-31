@@ -40,7 +40,69 @@ python -m myskills --version
 python -m myskills --help
 ```
 
-> Subcommands (`add`, `list`, `remove`, `update`, `import`) are not yet wired -- the foundational modules are in place and ready for integration.
+### Skill Management Commands
+
+#### Install a skill from the repository
+
+```bash
+# Install a skill (interactive agent selection)
+myskills add <skill-name>
+
+# Install with verbose output
+myskills -v add <skill-name>
+
+# Example workflow:
+# 1. Syncs the skills repository
+# 2. Validates the skill exists
+# 3. Prompts to select target agents (Claude, Cursor, Copilot, Windsurf)
+# 4. Shows installation summary
+# 5. Asks for confirmation
+# 6. Creates primary copy in .agents/skills/<skill-name>/
+# 7. Creates symlinks in selected agent directories
+# 8. Updates .myskills.json configuration
+```
+
+**Exit codes:**
+- `0` - Success
+- `1` - General error (invalid manifest, permission error)
+- `2` - Skill not found in repository
+- `3` - Repository unreachable
+- `130` - User cancelled (declined confirmation or Ctrl+C)
+
+**Prerequisites:**
+- Must be run from within a Git repository (project root)
+- First run requires `MYSKILLS_REPO_URL` environment variable or existing `.myskills.json` configuration
+
+**Example:**
+```bash
+# Set your skills repository URL (first time only)
+export MYSKILLS_REPO_URL="git@github.com:your-org/skills-repo.git"
+
+# Install a skill
+myskills add find-skills
+
+# Output:
+# Syncing repository...
+# Found skill: find-skills (v1.0.0) - Helps discover and install agent skills
+# 
+# Select agents to install 'find-skills' for:
+#  [x] Claude
+#  [ ] Cursor
+#  [x] Windsurf
+#  [ ] Copilot
+# 
+# Installation summary:
+#   Primary: .agents/skills/find-skills/
+#     Files: 3
+#   Symlinks:
+#     .claude/skills/find-skills -> .agents/skills/find-skills
+#     .windsurf/skills/find-skills -> .agents/skills/find-skills
+# 
+# Proceed with installation? [y/N]: y
+# Installed find-skills (v1.0.0) for claude, windsurf
+```
+
+> **Status**: `add` command is fully functional (MVP). Additional commands (`list`, `remove`, `update`, `import`) are planned for future releases.
 
 ### Running tests
 
