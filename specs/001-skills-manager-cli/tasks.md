@@ -24,10 +24,10 @@
 
 **Purpose**: Project initialization, dependency configuration, and basic structure
 
-- [ ] T001 Create project structure with `src/myskills/` and `tests/` directories per implementation plan
-- [ ] T002 Create `pyproject.toml` with project metadata, click/dulwich/simple-term-menu/pyyaml/paramiko dependencies, dev/test extras (pytest, pytest-cov, pytest-subprocess, pytest-mock, ruff, mypy, pyinstaller), console_scripts entry point, and ruff configuration
-- [ ] T003 [P] Create `src/myskills/__init__.py` with package version string
-- [ ] T004 [P] Create `src/myskills/__main__.py` with entry point (`python -m myskills` support)
+- [X] T001 Create project structure with `src/myskills/` and `tests/` directories per implementation plan
+- [X] T002 Create `pyproject.toml` with project metadata, click/dulwich/simple-term-menu/pyyaml/paramiko dependencies, dev/test extras (pytest, pytest-cov, pytest-subprocess, pytest-mock, ruff, mypy, pyinstaller), console_scripts entry point, and ruff configuration
+- [X] T003 [P] Create `src/myskills/__init__.py` with package version string
+- [X] T004 [P] Create `src/myskills/__main__.py` with entry point (`python -m myskills` support)
 
 ---
 
