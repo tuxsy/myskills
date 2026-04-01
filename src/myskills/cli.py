@@ -10,8 +10,14 @@ from myskills import __version__
 from myskills.git_ops import GitError
 from myskills.models import SkillsRepository
 from myskills.project import ProjectError, get_project_context
-from myskills.skill_ops import SkillOperationError, install_skill, list_skills, remove_skill
-from myskills.skill_ops import update_skills
+from myskills.skill_ops import (
+    SkillOperationError,
+    import_skill,
+    install_skill,
+    list_skills,
+    remove_skill,
+    update_skills,
+)
 from myskills.ui import TerminalUI
 
 
@@ -383,6 +389,104 @@ def update(ctx: click.Context) -> None:
         ui.error(f"Repository error: {e}")
         ui.info("Check your network connection and repository URL.")
         sys.exit(3)
+
+    except KeyboardInterrupt:
+        ui.warning("\nOperation cancelled by user.")
+        sys.exit(130)
+
+    except Exception as e:
+        ui.error(f"Unexpected error: {e}")
+        if verbose:
+            import traceback
+
+            traceback.print_exc()
+        sys.exit(1)
+
+
+@main.command("import")
+@click.argument("path", type=click.Path(exists=True, path_type=Path))
+@click.pass_context
+def import_command(ctx: click.Context, path: Path) -> None:
+    """Import a local skill directory to the repository.
+
+    PATH is the path to the local skill directory containing SKILL.md.
+
+    This command will:
+    1. Validate the skill directory has a valid manifest
+    2. Sync the skills repository
+    3. Check for name conflicts in the repository
+    4. Display an import summary
+    5. Ask for confirmation before proceeding
+    6. Copy the skill to the repository and commit/push
+
+    Exit codes:
+        0: Skill imported successfully
+        1: General error (invalid manifest, push failure, etc.)
+        2: Invalid skill directory
+        3: Repository unreachable
+        130: User cancelled (declined confirmation or Ctrl+C)
+    """
+    verbose = ctx.obj.get("verbose", False)
+    ui = TerminalUI(verbose_mode=verbose)
+
+    try:
+        # Get project context
+        project = get_project_context()
+        ui.verbose(f"Project root: {project.root}")
+
+        # Get repository configuration
+        from myskills.config import read_config
+
+        if project.config_path.exists():
+            config = read_config(project.config_path)
+            repo_url = config.get("repository")
+        else:
+            import os
+
+            repo_url = os.getenv("MYSKILLS_REPO_URL")
+            if not repo_url:
+                ui.error(
+                    "No repository configured. Please set MYSKILLS_REPO_URL "
+                    "environment variable or run from a project with .myskills.json."
+                )
+                sys.exit(1)
+
+        # Set up repository cache location
+        cache_dir = Path.home() / ".cache" / "myskills" / "repo"
+        repo = SkillsRepository(url=repo_url, local_cache=cache_dir)
+
+        # Import the skill
+        import_skill(
+            skill_path=path,
+            project=project,
+            repo=repo,
+            ui=ui,
+        )
+
+    except ProjectError as e:
+        ui.error(str(e))
+        sys.exit(1)
+
+    except GitError as e:
+        ui.error(f"Repository error: {e}")
+        ui.info("Check your network connection and repository URL.")
+        sys.exit(3)
+
+    except SkillOperationError as e:
+        error_msg = str(e).lower()
+
+        # Check for repository errors
+        if hasattr(e, "is_repo_error") and e.is_repo_error:
+            ui.error(str(e))
+            sys.exit(3)
+        elif "invalid" in error_msg or "missing" in error_msg:
+            ui.error(str(e))
+            sys.exit(2)
+        elif "cancelled" in error_msg or "abort" in error_msg:
+            sys.exit(130)
+        else:
+            ui.error(str(e))
+            sys.exit(1)
 
     except KeyboardInterrupt:
         ui.warning("\nOperation cancelled by user.")

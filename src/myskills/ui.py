@@ -136,6 +136,7 @@ class FakeUI:
         self._confirm_responses: list[bool] = []
         self._multi_select_responses: list[list[int]] = []
         self._select_action_responses: list[int] = []
+        self._choice_responses: list[str] = []
 
     def set_confirm_responses(self, *responses: bool) -> None:
         """Set responses for confirm() calls (consumed in order)."""
@@ -148,6 +149,10 @@ class FakeUI:
     def set_select_action_responses(self, *responses: int) -> None:
         """Set responses for select_action() calls (consumed in order)."""
         self._select_action_responses = list(responses)
+
+    def set_choice_responses(self, *responses: str) -> None:
+        """Set responses for choice prompts (consumed in order)."""
+        self._choice_responses = list(responses)
 
     def info(self, message: str) -> None:
         self.messages.append(("info", message))
@@ -186,3 +191,9 @@ class FakeUI:
         if self._select_action_responses:
             return self._select_action_responses.pop(0)
         return 0
+
+    def get_choice_response(self) -> str | None:
+        """Get next choice response if available."""
+        if self._choice_responses:
+            return self._choice_responses.pop(0)
+        return None

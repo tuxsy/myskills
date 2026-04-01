@@ -8,8 +8,19 @@ from pathlib import Path
 
 from myskills.agents import SUPPORTED_AGENTS
 from myskills.config import CONFIG_VERSION, read_config, write_config
-from myskills.git_ops import GitError, clone_repository, pull_repository
-from myskills.manifest import ManifestError, parse_manifest
+from myskills.git_ops import (
+    GitError,
+    clone_repository,
+    commit_changes,
+    pull_repository,
+    push_repository,
+)
+from myskills.manifest import (
+    ManifestError,
+    parse_manifest,
+    update_manifest_with_version,
+    was_version_missing,
+)
 from myskills.models import ProjectContext, Skill, SkillsRepository
 from myskills.rollback import UndoStack
 from myskills.symlinks import create_skill_symlinks
@@ -18,6 +29,16 @@ from myskills.ui import UIProvider
 
 class SkillOperationError(Exception):
     """Raised when skill operations fail."""
+
+    def __init__(self, message: str, is_repo_error: bool = False):
+        """Initialize SkillOperationError.
+
+        Args:
+            message: Error message.
+            is_repo_error: Whether this is a repository connectivity error.
+        """
+        super().__init__(message)
+        self.is_repo_error = is_repo_error
 
 
 def sync_repository(repo: SkillsRepository, ui: UIProvider) -> None:
@@ -64,7 +85,8 @@ def get_skill_from_repo(skill_name: str, repo: SkillsRepository) -> Skill:
         )
 
     try:
-        manifest = parse_manifest(skill_dir)
+        # Pass ui=None since get_skill_from_repo doesn't have ui context
+        manifest = parse_manifest(skill_dir, ui=None)
     except ManifestError as e:
         raise SkillOperationError(f"Invalid skill manifest: {e}") from e
 
@@ -479,7 +501,7 @@ def list_skills(
 
         # Try to parse manifest
         try:
-            manifest = parse_manifest(item)
+            manifest = parse_manifest(item, ui=ui)
             skills.append(
                 {
                     "name": manifest.name,
@@ -705,3 +727,138 @@ def update_skills(
         summary["updated"].append(skill_name)
 
     return summary
+
+
+def import_skill(
+    skill_path: Path,
+    project: ProjectContext,
+    repo: SkillsRepository,
+    ui: UIProvider,
+) -> None:
+    """Import a local skill directory to the repository.
+
+    Args:
+        skill_path: Path to the local skill directory.
+        project: ProjectContext instance.
+        repo: SkillsRepository instance.
+        ui: UI provider for user feedback.
+
+    Raises:
+        SystemExit: With appropriate exit code on error or cancellation.
+    """
+    import sys
+
+    # 1. Validate skill directory and manifest
+    ui.verbose(f"Validating skill directory: {skill_path}")
+
+    if not skill_path.exists():
+        ui.error(f"Skill directory '{skill_path}' does not exist.")
+        sys.exit(2)
+
+    if not skill_path.is_dir():
+        ui.error(f"Path '{skill_path}' is not a directory.")
+        sys.exit(2)
+
+    try:
+        manifest = parse_manifest(skill_path, ui=ui)
+    except ManifestError as e:
+        ui.error(f"Invalid skill directory. {e}")
+        sys.exit(2)
+
+    # If version was missing, add explicit version field before importing
+    if was_version_missing(skill_path):
+        ui.verbose(f"Adding explicit version field to {skill_path / 'SKILL.md'}")
+        try:
+            update_manifest_with_version(skill_path, manifest.version)
+        except Exception as e:
+            ui.error(f"Failed to add version field to manifest: {e}")
+            sys.exit(1)
+
+    skill_name = manifest.name
+    ui.info(f"Found: {skill_name} (v{manifest.version}) - {manifest.description}")
+
+    # 2. Sync repository
+    ui.verbose("Syncing repository...")
+    try:
+        sync_repository(repo, ui)
+    except GitError as e:
+        ui.error(f"Repository unreachable: {e}")
+        raise SkillOperationError(str(e), is_repo_error=True) from e
+
+    # 3. Check if skill name already exists in repository
+    repo_skill_dir = repo.local_cache / skill_name
+    conflict_exists = repo_skill_dir.exists()
+
+    if conflict_exists:
+        ui.warning(f"Skill '{skill_name}' already exists in the repository.")
+
+        # Get choice response from UI (for testing) or prompt user
+        if hasattr(ui, "get_choice_response"):
+            choice = ui.get_choice_response()
+        else:
+            # In real UI, use select_action
+            action_idx = ui.select_action(
+                "Choose action:",
+                ["Overwrite existing skill", "Abort import"],
+            )
+            choice = "overwrite" if action_idx == 0 else "abort"
+
+        if choice == "abort":
+            ui.info("Import aborted.")
+            sys.exit(130)
+
+        if choice == "overwrite":
+            ui.warning(f"Will overwrite existing skill '{skill_name}'")
+            # Remove existing skill directory
+            try:
+                shutil.rmtree(repo_skill_dir)
+                ui.verbose(f"Removed existing skill directory: {repo_skill_dir}")
+            except Exception as e:
+                ui.error(f"Failed to remove existing skill: {e}")
+                sys.exit(1)
+
+    # 4. Display import summary
+    files = sorted(f.relative_to(skill_path) for f in skill_path.rglob("*") if f.is_file())
+    ui.info("\nImport summary:")
+    ui.info(f"  Skill: {skill_name} (v{manifest.version})")
+    ui.info(f"  Files to publish ({len(files)}):")
+    for f in files[:5]:  # Show first 5 files
+        ui.info(f"    {f}")
+    if len(files) > 5:
+        ui.info(f"    ... and {len(files) - 5} more")
+
+    # 5. Require user confirmation
+    if not ui.confirm("\nPublish to repository?", default=False):
+        ui.info("Import cancelled.")
+        sys.exit(130)
+
+    # 6. Copy skill to repository clone
+    ui.verbose(f"Copying skill to repository: {repo_skill_dir}")
+    try:
+        shutil.copytree(skill_path, repo_skill_dir)
+        ui.verbose(f"Copied {len(files)} files")
+    except Exception as e:
+        ui.error(f"Failed to copy skill files: {e}")
+        sys.exit(1)
+
+    # 7. Commit changes
+    ui.verbose("Committing changes...")
+    commit_message = f"Import skill: {skill_name} v{manifest.version}"
+    try:
+        commit_changes(repo.local_cache, message=commit_message, verbose=False)
+        ui.verbose("Changes committed")
+    except GitError as e:
+        ui.error(f"Failed to commit changes: {e}")
+        sys.exit(1)
+
+    # 8. Push to repository
+    ui.verbose("Pushing to repository...")
+    try:
+        push_repository(repo.local_cache, verbose=False)
+        ui.verbose("Changes pushed to remote")
+    except GitError as e:
+        ui.error(f"Failed to push to repository: {e}")
+        sys.exit(1)
+
+    # 9. Display success message
+    ui.success(f"Imported {skill_name} (v{manifest.version}) to repository.")

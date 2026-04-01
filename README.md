@@ -231,7 +231,69 @@ myskills update
 - Handles existing symlinks gracefully (idempotent)
 - Skips skills already at latest version
 
-> **Status**: `add`, `list`, `remove`, and `update` commands are fully functional. Additional commands (`import`) are planned for future releases.
+#### Import a local skill to the repository
+
+```bash
+# Publish a local skill directory to the repository
+myskills import <path>
+
+# Import with verbose output
+myskills -v import <path>
+
+# Example workflow:
+# 1. Validates the skill directory has a valid SKILL.md manifest
+# 2. Syncs the skills repository
+# 3. Checks for name conflicts in the repository
+# 4. Prompts for conflict resolution (overwrite/abort) if needed
+# 5. Shows import summary with files to be published
+# 6. Asks for confirmation
+# 7. Copies the skill to the repository clone
+# 8. Commits changes with descriptive message
+# 9. Pushes to remote repository
+```
+
+**Exit codes:**
+- `0` - Success (skill imported and pushed)
+- `1` - General error (invalid manifest, push failure)
+- `2` - Invalid skill directory (missing or invalid SKILL.md)
+- `3` - Repository unreachable
+- `130` - User cancelled (declined confirmation or Ctrl+C)
+
+**Example:**
+```bash
+# Import a local skill
+myskills import ./my-custom-skill
+
+# Output:
+# Validating skill directory: ./my-custom-skill
+# Found: my-custom-skill (v1.0.0) - My custom AI skill
+# Syncing repository...
+# 
+# Import summary:
+#   Skill: my-custom-skill (v1.0.0)
+#   Files to publish (3):
+#     SKILL.md
+#     instructions.md
+#     README.md
+# 
+# Publish to repository? [y/N]: y
+# Committing changes...
+# Pushing to repository...
+# Imported my-custom-skill (v1.0.0) to repository.
+```
+
+**Conflict handling:**
+- If a skill with the same name exists, you'll be prompted to:
+  - **Overwrite** - Replace the existing skill with your version
+  - **Abort** - Cancel the import operation
+
+**Requirements:**
+- The skill directory must contain a valid `SKILL.md` file with YAML front-matter
+- Required fields: `name`, `description`, `version` (semver format)
+- The `name` in SKILL.md must match the directory name
+- You must have push access to the configured repository
+
+> **Status**: All core commands (`add`, `list`, `remove`, `update`, `import`) are fully functional and production-ready.
 
 ### Running tests
 

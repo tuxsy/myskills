@@ -157,14 +157,14 @@
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T038 [P] [US5] Write tests for import logic (happy path, duplicate name conflict, invalid manifest, push failure) in `tests/test_import.py`
-- [ ] T039 [P] [US5] Write CLI tests for `import` command (CliRunner with path arg and confirmation) in `tests/test_cli.py` (import command section)
+- [X] T038 [P] [US5] Write tests for import logic (happy path, duplicate name conflict, invalid manifest, push failure) in `tests/test_import.py`
+- [X] T039 [P] [US5] Write CLI tests for `import` command (CliRunner with path arg and confirmation) in `tests/test_cli.py` (import command section)
 
 ### Implementation for User Story 5
 
-- [ ] T040 [US5] Implement skill import orchestration (validate manifest at path, sync repo, check name conflict, display summary, confirm, copy to repo clone, commit, push) in `src/myskills/skill_ops.py` (`import_skill` function)
-- [ ] T041 [US5] Implement `import` CLI command with path argument, exit codes (0/1/2/3/130), and verbose output in `src/myskills/cli.py` per cli-contract.md import command flow
-- [ ] T042 [US5] Handle name conflict resolution (prompt for overwrite/rename/abort) in `src/myskills/skill_ops.py`
+- [X] T040 [US5] Implement skill import orchestration (validate manifest at path, sync repo, check name conflict, display summary, confirm, copy to repo clone, commit, push) in `src/myskills/skill_ops.py` (`import_skill` function)
+- [X] T041 [US5] Implement `import` CLI command with path argument, exit codes (0/1/2/3/130), and verbose output in `src/myskills/cli.py` per cli-contract.md import command flow
+- [X] T042 [US5] Handle name conflict resolution (prompt for overwrite/rename/abort) in `src/myskills/skill_ops.py`
 
 **Checkpoint**: User Story 5 fully functional. `./myskills import <path>` publishes skills to the repository.
 

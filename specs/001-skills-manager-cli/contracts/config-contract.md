@@ -117,15 +117,16 @@ Detailed documentation for the skill...
 |-------|------|----------|------------|
 | `name` | string | Yes | Must match `^[a-z0-9][a-z0-9-]*[a-z0-9]$`, min 2 chars, must match directory name |
 | `description` | string | Yes | Non-empty string |
-| `version` | string | Yes | Valid semver: `MAJOR.MINOR.PATCH` |
+| `version` | string | No (defaults to 1.0.0) | Valid semver: `MAJOR.MINOR.PATCH` |
 
 ### Validation Rules
 
 1. `SKILL.md` must exist in the skill root directory
 2. File must start with `---` (YAML front-matter delimiter)
-3. All required fields must be present and non-empty
+3. Required fields (`name`, `description`) must be present and non-empty
 4. `name` must match the containing directory name
-5. `version` must be a valid semantic version string
+5. `version` must be a valid semantic version string (if present; defaults to "1.0.0" if missing)
+6. When importing skills to repository, missing `version` field is automatically added with value "1.0.0"
 
 ### Error Messages for Validation Failures
 

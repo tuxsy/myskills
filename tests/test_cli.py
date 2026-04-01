@@ -804,3 +804,235 @@ class TestUpdateCommand:
         # Assert: Command succeeds despite dangling links
         assert result.exit_code == 0, f"Output: {result.output}"
         assert mock_remove.called
+
+
+class TestImportCommand:
+    """Tests for the 'import' CLI command - T039."""
+
+    def test_import_command_happy_path(
+        self,
+        tmp_project: Path,
+        skill_dir_factory,
+        cli_runner: CliRunner,
+    ) -> None:
+        """Import command publishes local skill to repository successfully."""
+        # Arrange: Create local skill to import
+        skill_name = "my-skill"
+        local_skill = skill_dir_factory(
+            skill_name,
+            version="1.0.0",
+            description="My custom skill",
+        )
+
+        repo_dir = tmp_project / "repo"
+        repo_dir.mkdir()
+        (repo_dir / ".git").mkdir()
+
+        project = ProjectContext(root=tmp_project)
+        config = {
+            "version": CONFIG_VERSION,
+            "repository": str(repo_dir),
+            "installations": {},
+        }
+        write_config(project.config_path, config)
+
+        # Mock import_skill to succeed
+        with patch("myskills.cli.import_skill") as mock_import:
+            mock_import.return_value = None
+
+            # Act
+            original_cwd = os.getcwd()
+            try:
+                os.chdir(tmp_project)
+                result = cli_runner.invoke(main, ["import", str(local_skill)])
+            finally:
+                os.chdir(original_cwd)
+
+        # Assert: Command succeeds
+        assert result.exit_code == 0, f"Output: {result.output}\nException: {result.exception}"
+        assert mock_import.called
+
+    def test_import_command_invalid_path(
+        self,
+        tmp_project: Path,
+        tmp_path: Path,
+        cli_runner: CliRunner,
+    ) -> None:
+        """Import command exits with code 2 when skill path is invalid."""
+        # Arrange
+        project = ProjectContext(root=tmp_project)
+        config = {
+            "version": CONFIG_VERSION,
+            "repository": "git@github.com:org/repo.git",
+            "installations": {},
+        }
+        write_config(project.config_path, config)
+
+        invalid_path = tmp_path / "nonexistent"
+
+        # Mock import_skill to raise error
+        from myskills.skill_ops import SkillOperationError
+
+        with patch("myskills.cli.import_skill") as mock_import:
+            mock_import.side_effect = SkillOperationError(
+                "Invalid skill directory. Missing required manifest file (SKILL.md)."
+            )
+
+            # Act
+            original_cwd = os.getcwd()
+            try:
+                os.chdir(tmp_project)
+                result = cli_runner.invoke(main, ["import", str(invalid_path)])
+            finally:
+                os.chdir(original_cwd)
+
+        # Assert: Exit code 2 (invalid)
+        assert result.exit_code == 2, f"Output: {result.output}"
+        assert "invalid" in result.output.lower() or "missing" in result.output.lower()
+
+    def test_import_command_push_failure(
+        self,
+        tmp_project: Path,
+        skill_dir_factory,
+        cli_runner: CliRunner,
+    ) -> None:
+        """Import command exits with code 1 on push failure."""
+        # Arrange
+        skill_name = "test-skill"
+        local_skill = skill_dir_factory(skill_name, version="1.0.0")
+
+        project = ProjectContext(root=tmp_project)
+        config = {
+            "version": CONFIG_VERSION,
+            "repository": "git@github.com:org/repo.git",
+            "installations": {},
+        }
+        write_config(project.config_path, config)
+
+        # Mock import_skill to raise error
+        from myskills.skill_ops import SkillOperationError
+
+        with patch("myskills.cli.import_skill") as mock_import:
+            mock_import.side_effect = SkillOperationError("Failed to push to repository.")
+
+            # Act
+            original_cwd = os.getcwd()
+            try:
+                os.chdir(tmp_project)
+                result = cli_runner.invoke(main, ["import", str(local_skill)])
+            finally:
+                os.chdir(original_cwd)
+
+        # Assert: Exit code 1 (general error)
+        assert result.exit_code == 1, f"Output: {result.output}"
+        assert "failed" in result.output.lower() or "error" in result.output.lower()
+
+    def test_import_command_user_cancels(
+        self,
+        tmp_project: Path,
+        skill_dir_factory,
+        cli_runner: CliRunner,
+    ) -> None:
+        """Import command exits with code 130 when user cancels."""
+        # Arrange
+        skill_name = "test-skill"
+        local_skill = skill_dir_factory(skill_name, version="1.0.0")
+
+        project = ProjectContext(root=tmp_project)
+        config = {
+            "version": CONFIG_VERSION,
+            "repository": "git@github.com:org/repo.git",
+            "installations": {},
+        }
+        write_config(project.config_path, config)
+
+        # Mock import_skill to raise cancellation error
+        from myskills.skill_ops import SkillOperationError
+
+        with patch("myskills.cli.import_skill") as mock_import:
+            mock_import.side_effect = SkillOperationError("User cancelled import.")
+
+            # Act
+            original_cwd = os.getcwd()
+            try:
+                os.chdir(tmp_project)
+                result = cli_runner.invoke(main, ["import", str(local_skill)])
+            finally:
+                os.chdir(original_cwd)
+
+        # Assert: Exit code 130 (user cancelled)
+        assert result.exit_code == 130, f"Output: {result.output}"
+
+    def test_import_command_repo_unreachable(
+        self,
+        tmp_project: Path,
+        skill_dir_factory,
+        cli_runner: CliRunner,
+    ) -> None:
+        """Import command exits with code 3 when repository is unreachable."""
+        # Arrange
+        skill_name = "test-skill"
+        local_skill = skill_dir_factory(skill_name, version="1.0.0")
+
+        project = ProjectContext(root=tmp_project)
+        config = {
+            "version": CONFIG_VERSION,
+            "repository": "git@github.com:org/unreachable.git",
+            "installations": {},
+        }
+        write_config(project.config_path, config)
+
+        # Mock import_skill to raise repository error
+        from myskills.skill_ops import SkillOperationError
+
+        with patch("myskills.cli.import_skill") as mock_import:
+            mock_import.side_effect = SkillOperationError(
+                "Repository unreachable",
+                is_repo_error=True,
+            )
+
+            # Act
+            original_cwd = os.getcwd()
+            try:
+                os.chdir(tmp_project)
+                result = cli_runner.invoke(main, ["import", str(local_skill)])
+            finally:
+                os.chdir(original_cwd)
+
+        # Assert: Exit code 3 (repo unreachable)
+        assert result.exit_code == 3, f"Output: {result.output}"
+
+    def test_import_command_with_verbose(
+        self,
+        tmp_project: Path,
+        skill_dir_factory,
+        cli_runner: CliRunner,
+    ) -> None:
+        """Import command with --verbose flag shows detailed output."""
+        # Arrange
+        skill_name = "test-skill"
+        local_skill = skill_dir_factory(skill_name, version="1.0.0")
+
+        project = ProjectContext(root=tmp_project)
+        config = {
+            "version": CONFIG_VERSION,
+            "repository": "git@github.com:org/repo.git",
+            "installations": {},
+        }
+        write_config(project.config_path, config)
+
+        # Mock import_skill to succeed
+        with patch("myskills.cli.import_skill") as mock_import:
+            mock_import.return_value = None
+
+            # Act
+            original_cwd = os.getcwd()
+            try:
+                os.chdir(tmp_project)
+                result = cli_runner.invoke(main, ["--verbose", "import", str(local_skill)])
+            finally:
+                os.chdir(original_cwd)
+
+        # Assert: Command succeeds and verbose flag is respected
+        assert result.exit_code == 0, f"Output: {result.output}"
+        assert mock_import.called

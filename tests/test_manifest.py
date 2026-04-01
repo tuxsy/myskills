@@ -4,7 +4,13 @@ from __future__ import annotations
 
 import pytest
 
-from myskills.manifest import ManifestError, parse_manifest
+from myskills.manifest import (
+    ManifestError,
+    parse_manifest,
+    update_manifest_with_version,
+    was_version_missing,
+)
+from myskills.ui import UIProvider
 
 
 class TestParseManifestValid:
@@ -117,16 +123,6 @@ class TestParseManifestMissingFields:
         with pytest.raises(ManifestError, match="missing required field 'description'"):
             parse_manifest(skill)
 
-    def test_missing_version(self, skill_dir_factory):
-        """Missing version field should raise ManifestError."""
-        skill = skill_dir_factory(
-            "no-ver",
-            front_matter="---\nname: no-ver\ndescription: test\n---\n",
-        )
-
-        with pytest.raises(ManifestError, match="missing required field 'version'"):
-            parse_manifest(skill)
-
     def test_empty_name(self, skill_dir_factory):
         """Empty name field should raise ManifestError."""
         skill = skill_dir_factory(
@@ -215,3 +211,95 @@ class TestParseManifestVersionValidation:
             )
             result = parse_manifest(skill)
             assert result.version == version
+
+
+class TestParseManifestVersionDefaults:
+    """Tests for version field defaulting behavior."""
+
+    def test_missing_version_defaults_to_1_0_0(self, skill_dir_factory):
+        """Missing version field should default to 1.0.0."""
+        skill = skill_dir_factory(
+            "no-ver",
+            front_matter="---\nname: no-ver\ndescription: test\n---\n",
+        )
+
+        result = parse_manifest(skill, ui=None)
+        assert result.version == "1.0.0"
+
+    def test_empty_version_defaults_to_1_0_0(self, skill_dir_factory):
+        """Empty version field should default to 1.0.0."""
+        skill = skill_dir_factory(
+            "empty-ver",
+            front_matter="---\nname: empty-ver\ndescription: test\nversion:\n---\n",
+        )
+
+        result = parse_manifest(skill, ui=None)
+        assert result.version == "1.0.0"
+
+    def test_version_default_with_verbose_ui_shows_warning(self, skill_dir_factory, mocker):
+        """Version defaulting with ui should show warning message."""
+        skill = skill_dir_factory(
+            "no-ver",
+            front_matter="---\nname: no-ver\ndescription: test\n---\n",
+        )
+
+        mock_ui = mocker.Mock(spec=UIProvider)
+        result = parse_manifest(skill, ui=mock_ui)
+
+        assert result.version == "1.0.0"
+        mock_ui.warning.assert_called_once_with(
+            "No version specified in SKILL.md for 'no-ver', assuming 1.0.0"
+        )
+
+    def test_version_default_without_ui_no_warning(self, skill_dir_factory):
+        """Version defaulting without ui should not raise error."""
+        skill = skill_dir_factory(
+            "no-ver",
+            front_matter="---\nname: no-ver\ndescription: test\n---\n",
+        )
+
+        # Should not raise any exception
+        result = parse_manifest(skill, ui=None)
+        assert result.version == "1.0.0"
+
+
+class TestManifestVersionHelpers:
+    """Tests for version helper functions."""
+
+    def test_was_version_missing_returns_true(self, skill_dir_factory):
+        """was_version_missing should return True when version field is absent."""
+        skill = skill_dir_factory(
+            "no-ver",
+            front_matter="---\nname: no-ver\ndescription: test\n---\n",
+        )
+
+        assert was_version_missing(skill) is True
+
+    def test_was_version_missing_returns_false(self, skill_dir_factory):
+        """was_version_missing should return False when version field is present."""
+        skill = skill_dir_factory(
+            "with-ver",
+            front_matter="---\nname: with-ver\ndescription: test\nversion: 2.0.0\n---\n",
+        )
+
+        assert was_version_missing(skill) is False
+
+    def test_update_manifest_with_version_adds_field(self, skill_dir_factory):
+        """update_manifest_with_version should add version field in correct order."""
+        skill = skill_dir_factory(
+            "no-ver",
+            front_matter="---\nname: no-ver\ndescription: test\n---\n\nBody content",
+        )
+
+        update_manifest_with_version(skill, "1.5.0")
+
+        updated_content = (skill / "SKILL.md").read_text()
+        lines = updated_content.split("\n")
+
+        # Check field order: name, description, version
+        assert lines[0] == "---"
+        assert lines[1] == "name: no-ver"
+        assert lines[2] == "description: test"
+        assert lines[3] == "version: 1.5.0"
+        assert lines[4] == "---"
+        assert "Body content" in updated_content
