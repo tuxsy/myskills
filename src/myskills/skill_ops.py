@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -23,7 +24,7 @@ from myskills.manifest import (
 )
 from myskills.models import ProjectContext, Skill, SkillsRepository
 from myskills.rollback import UndoStack
-from myskills.symlinks import create_skill_symlinks
+from myskills.symlinks import create_skill_symlinks, find_dangling_symlinks
 from myskills.ui import UIProvider
 
 
@@ -178,13 +179,21 @@ def install_skill(
         # action == 0: Reinstall - continue with installation
 
     # 5. Agent selection
-    agent_options = [agent.display_name for agent in SUPPORTED_AGENTS]
-    ui.info(f"\nSelect agents to install '{skill_name}' for:")
+    import os
 
-    selected_indices = ui.multi_select(
-        title="Select agents (Space to toggle, Enter to confirm):",
-        options=agent_options,
-    )
+    auto_select_env = os.getenv("MYSKILLS_AUTO_SELECT_AGENTS")
+    if auto_select_env:
+        # For testing: auto-select specified agents by index (comma-separated)
+        selected_indices = [int(i.strip()) for i in auto_select_env.split(",")]
+        ui.verbose(f"Auto-selected agent indices from env: {selected_indices}")
+    else:
+        agent_options = [agent.display_name for agent in SUPPORTED_AGENTS]
+        ui.info(f"\nSelect agents to install '{skill_name}' for:")
+
+        selected_indices = ui.multi_select(
+            title="Select agents (Space to toggle, Enter to confirm):",
+            options=agent_options,
+        )
 
     if not selected_indices:
         ui.warning("No agents selected. Installation cancelled.")
@@ -209,7 +218,20 @@ def install_skill(
         )
 
     # 7. Confirm with user
-    if not ui.confirm("\nProceed with installation?", default=False):
+    auto_confirm_env = os.getenv("MYSKILLS_AUTO_CONFIRM")
+    if auto_confirm_env:
+        if auto_confirm_env.lower() in ("1", "true", "yes"):
+            ui.verbose("Auto-confirmed from env")
+            confirmed = True
+        elif auto_confirm_env.lower() in ("0", "false", "no"):
+            ui.verbose("Auto-declined from env")
+            confirmed = False
+        else:
+            confirmed = ui.confirm("\nProceed with installation?", default=False)
+    else:
+        confirmed = ui.confirm("\nProceed with installation?", default=False)
+
+    if not confirmed:
         ui.info("Installation cancelled.")
         raise SkillOperationError("User cancelled installation.")
 
@@ -388,7 +410,20 @@ def remove_skill(
     ui.info(f"  Agents: {', '.join(installed_agents)}")
 
     # 5. Confirm with user
-    if not ui.confirm("\nProceed with removal?", default=False):
+    auto_confirm_env = os.getenv("MYSKILLS_AUTO_CONFIRM")
+    if auto_confirm_env:
+        if auto_confirm_env.lower() in ("1", "true", "yes"):
+            ui.verbose("Auto-confirmed from env")
+            confirmed = True
+        elif auto_confirm_env.lower() in ("0", "false", "no"):
+            ui.verbose("Auto-declined from env")
+            confirmed = False
+        else:
+            confirmed = ui.confirm("\nProceed with removal?", default=False)
+    else:
+        confirmed = ui.confirm("\nProceed with removal?", default=False)
+
+    if not confirmed:
         ui.info("Removal cancelled.")
         raise SkillOperationError("User cancelled removal.")
 
@@ -538,6 +573,9 @@ def list_skills(
 
     ui.verbose(f"Found {len(result)} skills in repository")
     ui.verbose(f"Installed: {len(installed_skills)}/{len(result)}")
+
+    # 6. Detect and offer cleanup for dangling symlinks (FR-013)
+    _detect_and_cleanup_dangling_symlinks(project, ui)
 
     return result
 
@@ -726,6 +764,9 @@ def update_skills(
         ui.success(f"Updated {skill_name}: {installed_version} -> {repo_skill.version}")
         summary["updated"].append(skill_name)
 
+    # Detect and offer cleanup for dangling symlinks (FR-013)
+    _detect_and_cleanup_dangling_symlinks(project, ui)
+
     return summary
 
 
@@ -862,3 +903,50 @@ def import_skill(
 
     # 9. Display success message
     ui.success(f"Imported {skill_name} (v{manifest.version}) to repository.")
+
+
+def _detect_and_cleanup_dangling_symlinks(project: ProjectContext, ui: UIProvider) -> None:
+    """Detect dangling symlinks in agent directories and offer cleanup (FR-013).
+
+    This function searches for dangling symlinks in all supported agent skill directories
+    and offers to clean them up if any are found.
+
+    Args:
+        project: ProjectContext instance.
+        ui: UI provider for user feedback.
+    """
+    # Search for dangling symlinks in all agent skill directories
+    dangling_links: list[Path] = []
+
+    for agent in SUPPORTED_AGENTS:
+        agent_skills_dir = project.root / agent.skills_dir
+        if agent_skills_dir.exists():
+            found = find_dangling_symlinks(agent_skills_dir)
+            dangling_links.extend(found)
+
+    # If no dangling symlinks found, nothing to do
+    if not dangling_links:
+        ui.verbose("No dangling symlinks detected")
+        return
+
+    # Inform user about dangling symlinks
+    ui.warning(f"\nFound {len(dangling_links)} dangling symlink(s):")
+    for link in dangling_links:
+        relative_link = link.relative_to(project.root)
+        ui.warning(f"  {relative_link}")
+
+    # Offer cleanup
+    if ui.confirm("\nClean up dangling symlinks?", default=True):
+        removed_count = 0
+        for link in dangling_links:
+            try:
+                link.unlink()
+                ui.verbose(f"Removed dangling symlink: {link}")
+                removed_count += 1
+            except OSError as e:
+                ui.warning(f"Failed to remove {link}: {e}")
+
+        if removed_count > 0:
+            ui.success(f"Cleaned up {removed_count} dangling symlink(s)")
+    else:
+        ui.info("Skipped cleanup")

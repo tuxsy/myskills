@@ -23,8 +23,7 @@ htmlcov/
 # Ruff
 .ruff_cache/
 
-# PyInstaller
-*.spec
+# PyInstaller artifacts (but keep myskills.spec)
 *.manifest
 *.log
 

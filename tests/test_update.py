@@ -11,9 +11,9 @@ from unittest.mock import patch
 
 import pytest
 
-from myskills.skill_ops import update_skills, SkillOperationError
+from myskills.config import CONFIG_VERSION, write_config
 from myskills.models import ProjectContext, SkillsRepository
-from myskills.config import write_config, CONFIG_VERSION
+from myskills.skill_ops import update_skills
 
 
 def test_update_no_repo(tmp_project: Path, tmp_path: Path):

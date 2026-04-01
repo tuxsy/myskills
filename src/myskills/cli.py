@@ -1,5 +1,6 @@
 """MySkills CLI entry point."""
 
+import os
 import sys
 import textwrap
 from pathlib import Path
@@ -19,6 +20,20 @@ from myskills.skill_ops import (
     update_skills,
 )
 from myskills.ui import TerminalUI
+
+
+def get_cache_dir() -> Path:
+    """Get the repository cache directory.
+
+    Can be overridden by MYSKILLS_CACHE_DIR environment variable.
+
+    Returns:
+        Path to the cache directory.
+    """
+    cache_dir_env = os.getenv("MYSKILLS_CACHE_DIR")
+    if cache_dir_env:
+        return Path(cache_dir_env)
+    return Path.home() / ".cache" / "myskills" / "repo"
 
 
 @click.group()
@@ -82,7 +97,7 @@ def add(ctx: click.Context, skill_name: str) -> None:
                 sys.exit(1)
 
         # Set up repository cache location
-        cache_dir = Path.home() / ".cache" / "myskills" / "repo"
+        cache_dir = get_cache_dir()
         repo = SkillsRepository(url=repo_url, local_cache=cache_dir)
 
         # Install the skill
@@ -169,7 +184,7 @@ def list(ctx: click.Context) -> None:
                 sys.exit(1)
 
         # Set up repository cache location
-        cache_dir = Path.home() / ".cache" / "myskills" / "repo"
+        cache_dir = get_cache_dir()
         repo = SkillsRepository(url=repo_url, local_cache=cache_dir)
 
         # List skills
@@ -371,7 +386,7 @@ def update(ctx: click.Context) -> None:
                 )
                 sys.exit(1)
 
-        cache_dir = Path.home() / ".cache" / "myskills" / "repo"
+        cache_dir = get_cache_dir()
         repo = SkillsRepository(url=repo_url, local_cache=cache_dir)
 
         summary = update_skills(project=project, repo=repo, ui=ui)
@@ -452,7 +467,7 @@ def import_command(ctx: click.Context, path: Path) -> None:
                 sys.exit(1)
 
         # Set up repository cache location
-        cache_dir = Path.home() / ".cache" / "myskills" / "repo"
+        cache_dir = get_cache_dir()
         repo = SkillsRepository(url=repo_url, local_cache=cache_dir)
 
         # Import the skill

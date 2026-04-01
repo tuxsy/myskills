@@ -174,14 +174,14 @@
 
 **Purpose**: Error handling hardening, integration testing, edge cases, and build configuration
 
-- [ ] T043 [P] Write comprehensive error handling tests (permission errors, network failures, disk full, corrupted config) in `tests/test_errors.py`
-- [ ] T044 [P] Write Git workflow integration tests with real local bare repos in `tests/integration/test_git_workflow.py` per R-004
-- [ ] T045 [P] Write end-to-end tests for full CLI command flows (add, list, remove, update, import) in `tests/integration/test_end_to_end.py`
-- [ ] T046 Implement dangling symlink detection and cleanup offer during `list` and `update` commands per FR-013 edge case in `src/myskills/skill_ops.py`
-- [ ] T047 [P] Create PyInstaller spec file (`myskills.spec`) with --onefile mode, lazy imports, excluded modules (tkinter, unittest, email, html, http, xml, pydoc, doctest), and runtime-tmpdir per R-005
-- [ ] T048 Verify all exit codes match cli-contract.md (0/1/2/3/130) across all commands in `src/myskills/cli.py`
-- [ ] T049 Run full test suite with coverage enforcement (`pytest --cov=myskills --cov-fail-under=80`) and fix any gaps
-- [ ] T050 Run `ruff check src/ tests/` and `ruff format src/ tests/` to ensure code passes lint and format standards
+- [X] T043 [P] Write comprehensive error handling tests (permission errors, network failures, disk full, corrupted config) in `tests/test_errors.py`
+- [X] T044 [P] Write Git workflow integration tests with real local bare repos in `tests/integration/test_git_workflow.py` per R-004
+- [X] T045 [P] Write end-to-end tests for full CLI command flows (add, list, remove, update, import) in `tests/integration/test_end_to_end.py`
+- [X] T046 Implement dangling symlink detection and cleanup offer during `list` and `update` commands per FR-013 edge case in `src/myskills/skill_ops.py`
+- [X] T047 [P] Create PyInstaller spec file (`myskills.spec`) with --onefile mode, lazy imports, excluded modules (tkinter, unittest, email, html, http, xml, pydoc, doctest), and runtime-tmpdir per R-005
+- [X] T048 Verify all exit codes match cli-contract.md (0/1/2/3/130) across all commands in `src/myskills/cli.py`
+- [X] T049 Run full test suite with coverage enforcement (`pytest --cov=myskills --cov-fail-under=80`) and fix any gaps
+- [X] T050 Run `ruff check src/ tests/` and `ruff format src/ tests/` to ensure code passes lint and format standards
 
 ---
 

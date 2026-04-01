@@ -59,11 +59,15 @@ def clone_repository(url: str, target: Path, verbose: bool = False) -> None:
 
                 dulwich.client.get_ssh_vendor = lambda: vendor  # type: ignore[assignment]
 
-        dulwich.porcelain.clone(**kwargs)
+        repo = dulwich.porcelain.clone(**kwargs)
+        if verbose and repo:
+            logger.info("Dulwich clone completed: %s", repo)
         return
     except Exception as e:
         if verbose:
-            logger.warning("Dulwich clone failed: %s. Trying system git...", e)
+            logger.warning(
+                "Dulwich clone failed: %s (%s). Trying system git...", type(e).__name__, e
+            )
         # Clean up partial clone
         if target.exists():
             shutil.rmtree(target, ignore_errors=True)
@@ -92,11 +96,24 @@ def pull_repository(repo_path: Path, verbose: bool = False) -> None:
 
         import dulwich.porcelain
 
-        dulwich.porcelain.pull(str(repo_path))
-        return
+        try:
+            result = dulwich.porcelain.pull(str(repo_path), fast_forward=True, ff_only=False)
+            # dulwich.porcelain.pull can return None or a tuple of (old_sha, new_sha)
+            # Both indicate success
+            if verbose and result:
+                logger.info("Dulwich pull completed: %s", result)
+            return
+        except dulwich.porcelain.DivergedBranches:
+            # If branches have diverged, use system git to handle merge
+            if verbose:
+                logger.info("Branches diverged, using system git for merge")
+            # Fall through to system git
+
     except Exception as e:
         if verbose:
-            logger.warning("Dulwich pull failed: %s. Trying system git...", e)
+            logger.warning(
+                "Dulwich pull failed: %s (%s). Trying system git...", type(e).__name__, e
+            )
 
     # Fallback to system git
     _fallback_git_pull(repo_path, verbose)
@@ -142,7 +159,9 @@ def push_repository(repo_path: Path, verbose: bool = False) -> None:
         return
     except Exception as e:
         if verbose:
-            logger.warning("Dulwich push failed: %s. Trying system git...", e)
+            logger.warning(
+                "Dulwich push failed: %s (%s). Trying system git...", type(e).__name__, e
+            )
 
     # Fallback to system git
     _fallback_git_push(repo_path, verbose)
@@ -225,20 +244,50 @@ def _fallback_git_pull(repo_path: Path, verbose: bool = False) -> None:
         )
 
     try:
-        cmd = [git, "pull"]
+        # First, try to fetch to ensure we have the latest refs
+        fetch_cmd = [git, "fetch"]
         if verbose:
-            logger.info("Falling back to system git: %s", " ".join(cmd))
-        result = subprocess.run(
-            cmd,
+            logger.info("Falling back to system git: %s", " ".join(fetch_cmd))
+        fetch_result = subprocess.run(
+            fetch_cmd,
             capture_output=True,
             text=True,
             timeout=120,
             cwd=repo_path,
         )
-        if result.returncode != 0:
-            raise GitError(f"git pull failed: {result.stderr.strip()}")
+        if fetch_result.returncode != 0:
+            raise GitError(f"git fetch failed: {fetch_result.stderr.strip()}")
+
+        # Get current branch
+        branch_cmd = [git, "rev-parse", "--abbrev-ref", "HEAD"]
+        branch_result = subprocess.run(
+            branch_cmd,
+            capture_output=True,
+            text=True,
+            timeout=10,
+            cwd=repo_path,
+        )
+        if branch_result.returncode != 0:
+            raise GitError(f"Failed to get current branch: {branch_result.stderr.strip()}")
+
+        current_branch = branch_result.stdout.strip()
+
+        # Merge the fetched changes
+        merge_cmd = [git, "merge", f"origin/{current_branch}"]
+        if verbose:
+            logger.info("Merging changes: %s", " ".join(merge_cmd))
+        merge_result = subprocess.run(
+            merge_cmd,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            cwd=repo_path,
+        )
+        if merge_result.returncode != 0:
+            raise GitError(f"git merge failed: {merge_result.stderr.strip()}")
+
     except subprocess.TimeoutExpired as e:
-        raise GitError("git pull timed out") from e
+        raise GitError("git operation timed out") from e
     except OSError as e:
         raise GitError(f"Failed to run system git: {e}") from e
 
