@@ -52,15 +52,45 @@ class TestCreateSymlink:
         with pytest.raises(SymlinkError, match="already exists"):
             create_symlink(target, link)
 
-    def test_create_symlink_existing_symlink_raises_error(self, tmp_path: Path):
-        """Creating a symlink where a symlink already exists should fail."""
+    def test_create_symlink_existing_symlink_is_idempotent(self, tmp_path: Path):
+        """Calling create_symlink when a symlink already exists and points to the same
+        target should be a no-op (not raise) and leave the link intact."""
         target = tmp_path / "target"
         target.mkdir()
         link = tmp_path / "link"
         link.symlink_to(target)
 
-        with pytest.raises(SymlinkError, match="already exists"):
-            create_symlink(target, link)
+        # Should not raise and should still be a symlink pointing to same target
+        create_symlink(target, link)
+        assert link.is_symlink()
+        assert link.resolve() == target.resolve()
+
+    def test_create_symlink_replaces_existing_symlink_pointing_elsewhere(self, tmp_path: Path):
+        """If an existing symlink points to a different target, it should be replaced."""
+        desired = tmp_path / "desired"
+        desired.mkdir()
+        other = tmp_path / "other"
+        other.mkdir()
+        link = tmp_path / "link"
+        link.symlink_to(other)
+
+        create_symlink(desired, link)
+        assert link.is_symlink()
+        assert link.resolve() == desired.resolve()
+
+    def test_create_symlink_replaces_dangling_symlink(self, tmp_path: Path):
+        """If an existing symlink is dangling, it should be replaced."""
+        desired = tmp_path / "desired"
+        desired.mkdir()
+        link = tmp_path / "link"
+        # create symlink pointing to non-existent path
+        link.symlink_to(tmp_path / "no-such-target")
+        # make sure it's dangling
+        assert link.is_symlink() and not link.exists()
+
+        create_symlink(desired, link)
+        assert link.is_symlink()
+        assert link.resolve() == desired.resolve()
 
     def test_create_symlink_uses_relative_path(self, tmp_path: Path):
         """Symlinks should use relative paths for portability."""

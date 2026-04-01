@@ -134,14 +134,14 @@
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T033 [P] [US4] Write tests for update logic (updates available, already current, repo unreachable, symlinks preserved after update) in `tests/test_update.py`
-- [ ] T034 [P] [US4] Write CLI tests for `update` command (CliRunner with confirmation input, version comparison output) in `tests/test_cli.py` (update command section)
+- [X] T033 [P] [US4] Write tests for update logic (updates available, already current, repo unreachable, symlinks preserved after update) in `tests/test_update.py`
+- [X] T034 [P] [US4] Write CLI tests for `update` command (CliRunner with confirmation input, version comparison output) in `tests/test_cli.py` (update command section)
 
 ### Implementation for User Story 4
 
-- [ ] T035 [US4] Implement update checking and execution logic (sync repo, compare installed versions vs repo versions, replace primary dir files, verify symlinks, update config) in `src/myskills/skill_ops.py` (`update_skills` function)
-- [ ] T036 [US4] Implement `update` CLI command with exit codes (0/1/3/130), update summary display, and verbose output in `src/myskills/cli.py` per cli-contract.md update command flow
-- [ ] T037 [US4] Ensure update uses rollback mechanism so partial updates don't leave inconsistent state in `src/myskills/skill_ops.py`
+- [X] T035 [US4] Implement update checking and execution logic (sync repo, compare installed versions vs repo versions, replace primary dir files, verify symlinks, update config) in `src/myskills/skill_ops.py` (`update_skills` function)
+- [X] T036 [US4] Implement `update` CLI command with exit codes (0/1/3/130), update summary display, and verbose output in `src/myskills/cli.py` per cli-contract.md update command flow
+- [X] T037 [US4] Ensure update uses rollback mechanism so partial updates don't leave inconsistent state in `src/myskills/skill_ops.py`
 
 **Checkpoint**: User Story 4 fully functional. `./myskills update` detects and applies skill updates while preserving symlinks.
 

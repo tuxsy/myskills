@@ -11,20 +11,39 @@ class SymlinkError(Exception):
 
 
 def create_symlink(target: Path, link_path: Path) -> None:
-    """Create a symbolic link pointing to target.
+    """Create a symbolic link pointing to target (idempotent).
+
+    If a symlink already exists at link_path:
+    - If it points to the same target: no-op (idempotent)
+    - If it points elsewhere or is dangling: replace it
 
     Args:
         target: The directory the symlink should point to (primary skill dir).
         link_path: Where to create the symlink.
 
     Raises:
-        SymlinkError: If symlink creation fails.
+        SymlinkError: If symlink creation fails or a non-symlink file/dir exists at link_path.
     """
-    if link_path.exists() or link_path.is_symlink():
-        raise SymlinkError(f"Link path already exists: '{link_path}'.")
-
     # Ensure parent directory exists
     link_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # If an existing symlink is present
+    if link_path.is_symlink():
+        # Compare resolved targets without raising for dangling symlinks
+        existing = link_path.resolve(strict=False)
+        desired = target.resolve(strict=False)
+        if existing == desired:
+            # Already correct, nothing to do
+            return
+        # Remove existing symlink (either pointing elsewhere or dangling)
+        try:
+            link_path.unlink()
+        except OSError as e:
+            raise SymlinkError(f"Failed to remove existing symlink '{link_path}': {e}") from e
+
+    # If a real file/dir exists at link_path, error (don't overwrite)
+    if link_path.exists():
+        raise SymlinkError(f"Link path already exists and is not a symlink: '{link_path}'.")
 
     try:
         # Use relative path for portability

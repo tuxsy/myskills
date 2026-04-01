@@ -11,6 +11,7 @@ from myskills.git_ops import GitError
 from myskills.models import SkillsRepository
 from myskills.project import ProjectError, get_project_context
 from myskills.skill_ops import SkillOperationError, install_skill, list_skills, remove_skill
+from myskills.skill_ops import update_skills
 from myskills.ui import TerminalUI
 
 
@@ -317,6 +318,71 @@ def remove(ctx: click.Context, skill_name: str) -> None:
         else:
             ui.error(str(e))
             sys.exit(1)
+
+    except KeyboardInterrupt:
+        ui.warning("\nOperation cancelled by user.")
+        sys.exit(130)
+
+    except Exception as e:
+        ui.error(f"Unexpected error: {e}")
+        if verbose:
+            import traceback
+
+            traceback.print_exc()
+        sys.exit(1)
+
+
+@main.command()
+@click.pass_context
+def update(ctx: click.Context) -> None:
+    """Check for updates to installed skills and apply them.
+
+    Exit codes:
+        0: Success
+        1: General error
+        3: Repository unreachable
+        130: User cancelled (Ctrl+C)
+    """
+    verbose = ctx.obj.get("verbose", False)
+    ui = TerminalUI(verbose_mode=verbose)
+
+    try:
+        project = get_project_context()
+        ui.verbose(f"Project root: {project.root}")
+
+        from myskills.config import read_config
+
+        if project.config_path.exists():
+            config = read_config(project.config_path)
+            repo_url = config.get("repository")
+        else:
+            import os
+
+            repo_url = os.getenv("MYSKILLS_REPO_URL")
+            if not repo_url:
+                ui.error(
+                    "No repository configured. Please set MYSKILLS_REPO_URL or create a .myskills.json."
+                )
+                sys.exit(1)
+
+        cache_dir = Path.home() / ".cache" / "myskills" / "repo"
+        repo = SkillsRepository(url=repo_url, local_cache=cache_dir)
+
+        summary = update_skills(project=project, repo=repo, ui=ui)
+
+        ui.info("\nUpdate summary:")
+        ui.info(f"  Updated: {len(summary.get('updated', []))}")
+        ui.info(f"  Current: {len(summary.get('current', []))}")
+        ui.info(f"  Failed: {len(summary.get('failed', []))}")
+
+    except ProjectError as e:
+        ui.error(str(e))
+        sys.exit(1)
+
+    except GitError as e:
+        ui.error(f"Repository error: {e}")
+        ui.info("Check your network connection and repository URL.")
+        sys.exit(3)
 
     except KeyboardInterrupt:
         ui.warning("\nOperation cancelled by user.")

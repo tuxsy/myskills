@@ -542,6 +542,78 @@ class TestRemoveCommand:
         assert result.exit_code == 0, f"Output: {result.output}\nException: {result.exception}"
         assert mock_remove.called
 
+
+class TestUpdateCommand:
+    """Tests for the 'update' CLI command (T034)."""
+
+    def test_update_command_happy_path(self, tmp_project: Path, cli_runner: CliRunner):
+        """Update command runs and reports summary when updates are applied."""
+        project = ProjectContext(root=tmp_project)
+
+        # Create a fake repo with an updated skill
+        repo_dir = tmp_project / "repo"
+        repo_dir.mkdir()
+        (repo_dir / ".git").mkdir()
+        skill_name = "skill-update"
+        skill_dir = repo_dir / skill_name
+        skill_dir.mkdir()
+        (skill_dir / "SKILL.md").write_text(
+            "---\nname: skill-update\ndescription: s\nversion: 2.0.0\n---\n",
+            encoding="utf-8",
+        )
+
+        config = {
+            "version": CONFIG_VERSION,
+            "repository": str(repo_dir),
+            "installations": {skill_name: {"version": "1.0.0", "agents": []}},
+        }
+        write_config(project.config_path, config)
+
+        # Run update command
+        original_cwd = None
+        try:
+            import os
+
+            original_cwd = os.getcwd()
+            os.chdir(tmp_project)
+            result = cli_runner.invoke(main, ["update"])
+        finally:
+            if original_cwd:
+                os.chdir(original_cwd)
+
+        assert result.exit_code == 0, f"Output: {result.output}\nException: {result.exception}"
+        assert "Updated:" in result.output
+
+    def test_update_command_repo_unreachable(self, tmp_project: Path, cli_runner: CliRunner):
+        """Update command exits with code 3 when repository is unreachable."""
+        project = ProjectContext(root=tmp_project)
+        config = {
+            "version": CONFIG_VERSION,
+            "repository": "git@github.com:org/unreachable.git",
+            "installations": {},
+        }
+        write_config(project.config_path, config)
+
+        # Simulate git error by patching sync to raise GitError via update_skills path
+        from myskills.git_ops import GitError
+
+        with patch("myskills.cli.update_skills") as mock_update:
+            mock_update.side_effect = GitError("Network error")
+
+            original_cwd = None
+            try:
+                import os
+
+                original_cwd = os.getcwd()
+                os.chdir(tmp_project)
+                result = cli_runner.invoke(main, ["update"])
+            finally:
+                if original_cwd:
+                    os.chdir(original_cwd)
+
+        assert result.exit_code == 3, f"Output: {result.output}"
+        assert "repository" in result.output.lower() or "network" in result.output.lower()
+
     def test_remove_command_skill_not_installed(
         self,
         tmp_project: Path,

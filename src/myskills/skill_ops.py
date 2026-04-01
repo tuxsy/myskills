@@ -518,3 +518,190 @@ def list_skills(
     ui.verbose(f"Installed: {len(installed_skills)}/{len(result)}")
 
     return result
+
+
+def update_skills(
+    project: ProjectContext,
+    repo: SkillsRepository,
+    ui: UIProvider,
+) -> dict[str, list[str]]:
+    """Check installed skills and update any that have newer versions in the repo.
+
+    Returns a summary dict with keys: updated, current, failed.
+
+    The function:
+    1. Validates project context
+    2. Syncs repository
+    3. Loads installed skills from config
+    4. For each installed skill, compares versions and updates if repo has newer
+    5. Uses UndoStack to ensure partial updates roll back
+    """
+    if not project.root.exists():
+        raise SkillOperationError(f"Project root '{project.root}' does not exist.")
+
+    try:
+        sync_repository(repo, ui)
+    except GitError:
+        ui.error("Failed to sync repository for update check")
+        raise
+
+    # Load installations
+    installations = {}
+    if project.config_path.exists():
+        config = read_config(project.config_path)
+        installations = config.get("installations", {})
+
+    summary = {"updated": [], "current": [], "failed": []}
+
+    # Iterate installed skills
+    for skill_name, info in installations.items():
+        try:
+            repo_skill = get_skill_from_repo(skill_name, repo)
+        except SkillOperationError:
+            ui.warning(f"Skill '{skill_name}' not found in repository; skipping")
+            summary["failed"].append(skill_name)
+            continue
+
+        installed_version = info.get("version")
+        if repo_skill.version == installed_version:
+            ui.verbose(f"{skill_name} is up-to-date (v{installed_version})")
+            summary["current"].append(skill_name)
+            continue
+
+        # Prepare update: replace primary dir contents atomically using UndoStack
+        primary_path = project.primary_skills_dir / skill_name
+
+        undo_stack = UndoStack(verbose=ui.verbose_mode if hasattr(ui, "verbose_mode") else False)
+
+        # Step: backup existing primary dir by moving it aside
+        backup_dir = primary_path.with_name(primary_path.name + ".backup")
+
+        def do_backup() -> None:
+            if primary_path.exists():
+                if backup_dir.exists():
+                    shutil.rmtree(backup_dir)
+                primary_path.replace(backup_dir)
+                ui.verbose(f"Backed up {primary_path} -> {backup_dir}")
+
+        def undo_backup() -> None:
+            # restore from backup if present
+            if backup_dir.exists():
+                if primary_path.exists():
+                    shutil.rmtree(primary_path)
+                backup_dir.replace(primary_path)
+                ui.verbose(f"Restored backup {backup_dir} -> {primary_path}")
+
+        undo_stack.add("Backup primary dir", do_backup, undo_backup)
+
+        # Step: copy new files into primary location
+        def do_copy_new() -> None:
+            try:
+                # Ensure parent exists
+                primary_path.parent.mkdir(parents=True, exist_ok=True)
+                # If primary exists (shouldn't after backup) remove
+                if primary_path.exists():
+                    shutil.rmtree(primary_path)
+                shutil.copytree(repo_skill.path, primary_path)
+                ui.verbose(f"Copied new version to {primary_path}")
+            except OSError as e:
+                raise SkillOperationError(f"Failed to copy new version: {e}") from e
+
+        def undo_copy_new() -> None:
+            if primary_path.exists():
+                try:
+                    shutil.rmtree(primary_path)
+                    ui.verbose(f"Removed primary dir during rollback: {primary_path}")
+                except OSError as e:
+                    ui.warning(f"Failed to remove primary dir during rollback: {e}")
+
+        undo_stack.add("Copy new version", do_copy_new, undo_copy_new)
+
+        # Step: recreate symlinks based on recorded agents
+        def do_create_symlinks() -> None:
+            agents = info.get("agents", [])
+            agent_dirs = [a.skills_dir for a in SUPPORTED_AGENTS if a.id in agents]
+            create_skill_symlinks(
+                primary_dir=primary_path,
+                project_root=project.root,
+                agent_skills_dirs=agent_dirs,
+                skill_name=skill_name,
+            )
+            ui.verbose(f"Recreated symlinks for {skill_name}")
+
+        def undo_create_symlinks() -> None:
+            # Best-effort: remove symlinks pointing to primary_path
+            for agent in SUPPORTED_AGENTS:
+                if agent.id in info.get("agents", []):
+                    link = project.root / agent.skills_dir / skill_name
+                    try:
+                        if link.is_symlink():
+                            link.unlink()
+                            ui.verbose(f"Removed symlink during rollback: {link}")
+                    except OSError as e:
+                        ui.warning(f"Failed to remove symlink during rollback: {e}")
+
+        undo_stack.add("Create symlinks", do_create_symlinks, undo_create_symlinks)
+
+        # Step: update config entry
+        original_config = None
+
+        def do_update_config() -> None:
+            nonlocal original_config
+            if project.config_path.exists():
+                original_config = read_config(project.config_path).copy()
+            else:
+                original_config = None
+
+            # Write new version
+            from myskills.config import add_installation
+
+            add_installation(
+                project.config_path,
+                repo.url,
+                skill_name,
+                repo_skill.version,
+                info.get("agents", []),
+            )
+            ui.verbose("Configuration updated with new version")
+
+        def undo_update_config() -> None:
+            try:
+                if original_config is not None:
+                    write_config(project.config_path, original_config)
+                    ui.verbose("Restored original configuration during rollback")
+                elif project.config_path.exists():
+                    project.config_path.unlink()
+
+            except Exception as e:
+                ui.warning(f"Failed to restore configuration during rollback: {e}")
+
+        undo_stack.add("Update config", do_update_config, undo_update_config)
+
+        # Execute update steps
+        try:
+            undo_stack.execute()
+        except Exception as e:
+            ui.error(f"Failed to update {skill_name}: {e}")
+            summary["failed"].append(skill_name)
+            # Attempt to clean backup if present
+            try:
+                if backup_dir.exists():
+                    # If backup still exists and primary doesn't, restore
+                    if not primary_path.exists():
+                        backup_dir.replace(primary_path)
+            except Exception:
+                ui.warning("Failed to restore backup after failed update")
+            continue
+
+        # If successful, remove backup if present
+        try:
+            if backup_dir.exists():
+                shutil.rmtree(backup_dir)
+                ui.verbose(f"Removed backup dir {backup_dir}")
+        except Exception:
+            ui.warning(f"Failed to remove backup dir {backup_dir}")
+
+        ui.success(f"Updated {skill_name}: {installed_version} -> {repo_skill.version}")
+        summary["updated"].append(skill_name)
+
+    return summary

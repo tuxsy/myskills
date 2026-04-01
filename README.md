@@ -184,7 +184,54 @@ myskills remove find-skills
 - Missing primary directory is detected and reported
 - All symlinks are removed even if primary directory is gone
 
-> **Status**: `add`, `list`, and `remove` commands are fully functional. Additional commands (`update`, `import`) are planned for future releases.
+#### Update installed skills
+
+```bash
+# Check for and apply updates to all installed skills
+myskills update
+
+# Update with verbose output
+myskills -v update
+
+# Example workflow:
+# 1. Syncs the skills repository to get latest versions
+# 2. Checks each installed skill against repository versions
+# 3. For skills with newer versions:
+#    - Backs up the current primary directory
+#    - Copies new version files to primary directory
+#    - Recreates symlinks (preserves agent selections)
+#    - Updates .myskills.json with new version
+# 4. Reports summary of updated, current, and failed skills
+```
+
+**Exit codes:**
+- `0` - Success (all updates applied or all skills current)
+- `1` - General error (one or more updates failed)
+- `3` - Repository unreachable
+
+**Example:**
+```bash
+# Update all installed skills
+myskills update
+
+# Output:
+# Syncing repository...
+# Updated code-review: 2.1.0 -> 2.2.0
+# find-skills is up-to-date (v1.0.0)
+# 
+# Summary:
+#   Updated: 1
+#   Current: 1
+#   Failed: 0
+```
+
+**Features:**
+- Atomic updates with automatic rollback on failure
+- Preserves existing agent selections (symlinks)
+- Handles existing symlinks gracefully (idempotent)
+- Skips skills already at latest version
+
+> **Status**: `add`, `list`, `remove`, and `update` commands are fully functional. Additional commands (`import`) are planned for future releases.
 
 ### Running tests
 
