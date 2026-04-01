@@ -141,7 +141,50 @@ myskills add find-skills
 # Installed find-skills (v1.0.0) for claude, windsurf
 ```
 
-> **Status**: `add` and `list` commands are fully functional. Additional commands (`remove`, `update`, `import`) are planned for future releases.
+#### Uninstall a skill
+
+```bash
+# Remove a skill from the project
+myskills remove <skill-name>
+
+# Remove with verbose output
+myskills -v remove <skill-name>
+
+# Example workflow:
+# 1. Checks if the skill is installed
+# 2. Shows removal summary (primary directory and symlinks)
+# 3. Asks for confirmation
+# 4. Removes all symlinks from agent directories
+# 5. Removes the primary skill directory
+# 6. Updates .myskills.json configuration
+```
+
+**Exit codes:**
+- `0` - Success
+- `1` - General error (permission error)
+- `2` - Skill not installed
+- `130` - User cancelled (declined confirmation or Ctrl+C)
+
+**Example:**
+```bash
+# Remove a skill
+myskills remove find-skills
+
+# Output:
+# Removing skill: find-skills (v1.0.0)
+#   Primary: .agents/skills/find-skills/
+#   Agents: claude, windsurf
+# 
+# Proceed with removal? [y/N]: y
+# Removed find-skills (v1.0.0)
+```
+
+**Edge cases handled:**
+- Dangling symlinks (primary directory manually deleted) are automatically cleaned up
+- Missing primary directory is detected and reported
+- All symlinks are removed even if primary directory is gone
+
+> **Status**: `add`, `list`, and `remove` commands are fully functional. Additional commands (`update`, `import`) are planned for future releases.
 
 ### Running tests
 

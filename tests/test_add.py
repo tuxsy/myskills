@@ -8,7 +8,7 @@ from unittest.mock import patch
 import pytest
 
 from myskills.agents import SUPPORTED_AGENTS
-from myskills.config import read_config, write_config, CONFIG_VERSION
+from myskills.config import CONFIG_VERSION, read_config, write_config
 from myskills.models import ProjectContext, SkillsRepository
 from myskills.ui import FakeUI
 
@@ -153,7 +153,6 @@ class TestInstallSkillAlreadyInstalled:
         """If skill is already installed, prompt for action; abort should exit cleanly."""
         # Arrange: Pre-install a skill
         from myskills import skill_ops
-        from myskills.config import write_config
 
         skill_name = "existing-skill"
         project = ProjectContext(root=tmp_project)
@@ -291,9 +290,11 @@ class TestInstallSkillRollback:
             raise SymlinkError("Simulated symlink failure")
 
         # Act & Assert: Installation should fail
-        with patch("myskills.skill_ops.create_skill_symlinks", mock_create_symlinks_fail):
-            with pytest.raises(skill_ops.SkillOperationError):
-                skill_ops.install_skill(skill_name, project, repo, fake_ui)
+        with (
+            patch("myskills.skill_ops.create_skill_symlinks", mock_create_symlinks_fail),
+            pytest.raises(skill_ops.SkillOperationError),
+        ):
+            skill_ops.install_skill(skill_name, project, repo, fake_ui)
 
         # Assert: Primary directory should NOT exist (rolled back)
         primary_dir = project.primary_skills_dir / skill_name

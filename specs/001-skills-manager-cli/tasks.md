@@ -111,14 +111,14 @@
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T028 [P] [US3] Write tests for remove skill logic (happy path, not installed, dangling symlinks, partial removal) in `tests/test_remove.py`
-- [ ] T029 [P] [US3] Write CLI tests for `remove` command (CliRunner with confirmation input) in `tests/test_cli.py` (remove command section)
+- [X] T028 [P] [US3] Write tests for remove skill logic (happy path, not installed, dangling symlinks, partial removal) in `tests/test_remove.py`
+- [X] T029 [P] [US3] Write CLI tests for `remove` command (CliRunner with confirmation input) in `tests/test_cli.py` (remove command section)
 
 ### Implementation for User Story 3
 
-- [ ] T030 [US3] Implement skill removal orchestration (validate project, check installed, display summary, confirm, remove symlinks, remove primary dir, update config) in `src/myskills/skill_ops.py` (`remove_skill` function)
-- [ ] T031 [US3] Implement `remove` CLI command with skill_name argument, exit codes (0/1/2/130), and verbose output in `src/myskills/cli.py` per cli-contract.md remove command flow
-- [ ] T032 [US3] Handle edge case: dangling symlinks where primary was manually deleted (detect and clean up remaining symlinks) in `src/myskills/skill_ops.py`
+- [X] T030 [US3] Implement skill removal orchestration (validate project, check installed, display summary, confirm, remove symlinks, remove primary dir, update config) in `src/myskills/skill_ops.py` (`remove_skill` function)
+- [X] T031 [US3] Implement `remove` CLI command with skill_name argument, exit codes (0/1/2/130), and verbose output in `src/myskills/cli.py` per cli-contract.md remove command flow
+- [X] T032 [US3] Handle edge case: dangling symlinks where primary was manually deleted (detect and clean up remaining symlinks) in `src/myskills/skill_ops.py`
 
 **Checkpoint**: User Story 3 fully functional. `./myskills remove <skill_name>` cleanly removes all traces of a skill.
 

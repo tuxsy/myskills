@@ -10,7 +10,7 @@ from myskills import __version__
 from myskills.git_ops import GitError
 from myskills.models import SkillsRepository
 from myskills.project import ProjectError, get_project_context
-from myskills.skill_ops import SkillOperationError, install_skill, list_skills
+from myskills.skill_ops import SkillOperationError, install_skill, list_skills, remove_skill
 from myskills.ui import TerminalUI
 
 
@@ -251,6 +251,72 @@ def list(ctx: click.Context) -> None:
         ui.error(f"Repository error: {e}")
         ui.info("Check your network connection and repository URL.")
         sys.exit(3)
+
+    except KeyboardInterrupt:
+        ui.warning("\nOperation cancelled by user.")
+        sys.exit(130)
+
+    except Exception as e:
+        ui.error(f"Unexpected error: {e}")
+        if verbose:
+            import traceback
+
+            traceback.print_exc()
+        sys.exit(1)
+
+
+@main.command()
+@click.argument("skill_name")
+@click.pass_context
+def remove(ctx: click.Context, skill_name: str) -> None:
+    """Uninstall a skill from the project.
+
+    SKILL_NAME is the name of the skill to remove.
+
+    This command will:
+    1. Check if the skill is installed
+    2. Display a removal summary (primary directory and symlinks)
+    3. Ask for confirmation before proceeding
+    4. Remove all symlinks for the skill
+    5. Remove the primary skill directory
+    6. Update the configuration
+
+    Exit codes:
+        0: Skill removed successfully
+        1: General error (permission error, etc.)
+        2: Skill not installed
+        130: User cancelled (declined confirmation or Ctrl+C)
+    """
+    verbose = ctx.obj.get("verbose", False)
+    ui = TerminalUI(verbose_mode=verbose)
+
+    try:
+        # Get project context
+        project = get_project_context()
+        ui.verbose(f"Project root: {project.root}")
+
+        # Remove the skill
+        remove_skill(
+            skill_name=skill_name,
+            project=project,
+            ui=ui,
+        )
+
+    except ProjectError as e:
+        ui.error(str(e))
+        sys.exit(1)
+
+    except SkillOperationError as e:
+        error_msg = str(e).lower()
+
+        if "not installed" in error_msg:
+            ui.error(str(e))
+            sys.exit(2)
+        elif "cancelled" in error_msg:
+            sys.exit(130)
+        else:
+            ui.error(str(e))
+            sys.exit(1)
 
     except KeyboardInterrupt:
         ui.warning("\nOperation cancelled by user.")

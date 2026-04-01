@@ -498,3 +498,237 @@ class TestListCommand:
         # Assert: Should fail with project context error
         assert result.exit_code in [1, 2], f"Output: {result.output}"
         # The error message should indicate project detection issue
+
+
+class TestRemoveCommand:
+    """Tests for the 'remove' CLI command (T029)."""
+
+    def test_remove_command_happy_path(
+        self,
+        tmp_project: Path,
+        cli_runner: CliRunner,
+    ) -> None:
+        """Remove command uninstalls skill successfully with confirmation."""
+        # Arrange
+        project = ProjectContext(root=tmp_project)
+        skill_name = "test-skill"
+
+        config = {
+            "version": CONFIG_VERSION,
+            "repository": "git@github.com:org/repo.git",
+            "installations": {
+                skill_name: {
+                    "version": "1.0.0",
+                    "agents": ["claude"],
+                    "installed_at": "2026-03-31T10:00:00Z",
+                }
+            },
+        }
+        write_config(project.config_path, config)
+
+        # Mock remove_skill to succeed
+        with patch("myskills.cli.remove_skill") as mock_remove:
+            mock_remove.return_value = None
+
+            # Act
+            original_cwd = os.getcwd()
+            try:
+                os.chdir(tmp_project)
+                result = cli_runner.invoke(main, ["remove", skill_name])
+            finally:
+                os.chdir(original_cwd)
+
+        # Assert: Command succeeds
+        assert result.exit_code == 0, f"Output: {result.output}\nException: {result.exception}"
+        assert mock_remove.called
+
+    def test_remove_command_skill_not_installed(
+        self,
+        tmp_project: Path,
+        cli_runner: CliRunner,
+    ) -> None:
+        """Remove command exits with code 2 when skill is not installed."""
+        # Arrange
+        project = ProjectContext(root=tmp_project)
+        config = {
+            "version": CONFIG_VERSION,
+            "repository": "git@github.com:org/repo.git",
+            "installations": {},
+        }
+        write_config(project.config_path, config)
+
+        # Mock remove_skill to raise SkillOperationError with "not installed"
+        from myskills.skill_ops import SkillOperationError
+
+        with patch("myskills.cli.remove_skill") as mock_remove:
+            mock_remove.side_effect = SkillOperationError(
+                "Skill 'nonexistent-skill' is not installed."
+            )
+
+            # Act
+            original_cwd = os.getcwd()
+            try:
+                os.chdir(tmp_project)
+                result = cli_runner.invoke(main, ["remove", "nonexistent-skill"])
+            finally:
+                os.chdir(original_cwd)
+
+        # Assert: Exit code 2 (skill not found/installed)
+        assert result.exit_code == 2, f"Output: {result.output}"
+        assert "not installed" in result.output.lower()
+
+    def test_remove_command_user_cancels(
+        self,
+        tmp_project: Path,
+        cli_runner: CliRunner,
+    ) -> None:
+        """Remove command exits with code 130 when user cancels confirmation."""
+        # Arrange
+        project = ProjectContext(root=tmp_project)
+        skill_name = "cancel-test"
+
+        config = {
+            "version": CONFIG_VERSION,
+            "repository": "git@github.com:org/repo.git",
+            "installations": {
+                skill_name: {
+                    "version": "1.0.0",
+                    "agents": ["claude"],
+                    "installed_at": "2026-03-31T10:00:00Z",
+                }
+            },
+        }
+        write_config(project.config_path, config)
+
+        # Mock remove_skill to raise cancellation error
+        from myskills.skill_ops import SkillOperationError
+
+        with patch("myskills.cli.remove_skill") as mock_remove:
+            mock_remove.side_effect = SkillOperationError("User cancelled removal.")
+
+            # Act
+            original_cwd = os.getcwd()
+            try:
+                os.chdir(tmp_project)
+                result = cli_runner.invoke(main, ["remove", skill_name])
+            finally:
+                os.chdir(original_cwd)
+
+        # Assert: Exit code 130 (user cancelled)
+        assert result.exit_code == 130, f"Output: {result.output}"
+
+    def test_remove_command_verbose_output(
+        self,
+        tmp_project: Path,
+        cli_runner: CliRunner,
+    ) -> None:
+        """Remove command with --verbose flag shows detailed operation output."""
+        # Arrange
+        project = ProjectContext(root=tmp_project)
+        skill_name = "verbose-test"
+
+        config = {
+            "version": CONFIG_VERSION,
+            "repository": "git@github.com:org/repo.git",
+            "installations": {
+                skill_name: {
+                    "version": "1.0.0",
+                    "agents": ["claude"],
+                    "installed_at": "2026-03-31T10:00:00Z",
+                }
+            },
+        }
+        write_config(project.config_path, config)
+
+        # Mock remove_skill to succeed
+        with patch("myskills.cli.remove_skill") as mock_remove:
+            mock_remove.return_value = None
+
+            # Act
+            original_cwd = os.getcwd()
+            try:
+                os.chdir(tmp_project)
+                result = cli_runner.invoke(main, ["--verbose", "remove", skill_name])
+            finally:
+                os.chdir(original_cwd)
+
+        # Assert: Command succeeds
+        assert result.exit_code == 0, f"Output: {result.output}"
+        assert mock_remove.called
+
+    def test_remove_command_keyboard_interrupt(
+        self,
+        tmp_project: Path,
+        cli_runner: CliRunner,
+    ) -> None:
+        """Remove command exits with code 130 when interrupted by user (Ctrl+C)."""
+        # Arrange
+        project = ProjectContext(root=tmp_project)
+        skill_name = "interrupt-test"
+
+        config = {
+            "version": CONFIG_VERSION,
+            "repository": "git@github.com:org/repo.git",
+            "installations": {
+                skill_name: {
+                    "version": "1.0.0",
+                    "agents": ["claude"],
+                    "installed_at": "2026-03-31T10:00:00Z",
+                }
+            },
+        }
+        write_config(project.config_path, config)
+
+        # Mock remove_skill to raise KeyboardInterrupt
+        with patch("myskills.cli.remove_skill") as mock_remove:
+            mock_remove.side_effect = KeyboardInterrupt()
+
+            # Act
+            original_cwd = os.getcwd()
+            try:
+                os.chdir(tmp_project)
+                result = cli_runner.invoke(main, ["remove", skill_name])
+            finally:
+                os.chdir(original_cwd)
+
+        # Assert: Exit code 130 (keyboard interrupt)
+        assert result.exit_code == 130, f"Output: {result.output}"
+
+    def test_remove_command_dangling_symlinks(
+        self,
+        tmp_project: Path,
+        cli_runner: CliRunner,
+    ) -> None:
+        """Remove command handles dangling symlinks gracefully."""
+        # Arrange: Skill with dangling symlinks scenario
+        project = ProjectContext(root=tmp_project)
+        skill_name = "dangling-skill"
+
+        config = {
+            "version": CONFIG_VERSION,
+            "repository": "git@github.com:org/repo.git",
+            "installations": {
+                skill_name: {
+                    "version": "1.0.0",
+                    "agents": ["claude"],
+                    "installed_at": "2026-03-31T10:00:00Z",
+                }
+            },
+        }
+        write_config(project.config_path, config)
+
+        # Mock remove_skill to succeed (implementation handles dangling links)
+        with patch("myskills.cli.remove_skill") as mock_remove:
+            mock_remove.return_value = None
+
+            # Act
+            original_cwd = os.getcwd()
+            try:
+                os.chdir(tmp_project)
+                result = cli_runner.invoke(main, ["remove", skill_name])
+            finally:
+                os.chdir(original_cwd)
+
+        # Assert: Command succeeds despite dangling links
+        assert result.exit_code == 0, f"Output: {result.output}"
+        assert mock_remove.called

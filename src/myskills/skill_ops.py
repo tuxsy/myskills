@@ -311,6 +311,122 @@ def install_skill(
     ui.success(f"Installed {skill_name} (v{skill.version}) for {agent_names}")
 
 
+def remove_skill(
+    skill_name: str,
+    project: ProjectContext,
+    ui: UIProvider,
+) -> None:
+    """Remove a skill from the project.
+
+    Flow:
+    1. Validate project context
+    2. Check if skill is installed
+    3. Load installation info from config
+    4. Display removal summary
+    5. Confirm with user
+    6. Remove symlinks for all agents
+    7. Remove primary directory
+    8. Update config
+    9. Display success message
+
+    Args:
+        skill_name: Name of the skill to remove.
+        project: ProjectContext instance.
+        ui: UI provider for user interaction.
+
+    Raises:
+        SkillOperationError: If removal fails or skill not installed.
+    """
+    # 1. Validate project context
+    if not project.root.exists():
+        raise SkillOperationError(f"Project root '{project.root}' does not exist.")
+
+    # 2. Check if skill is installed
+    if not is_skill_installed(skill_name, project):
+        raise SkillOperationError(
+            f"Skill '{skill_name}' is not installed.\nUse 'myskills list' to see installed skills."
+        )
+
+    # 3. Load installation info from config
+    config = read_config(project.config_path)
+    installation = config["installations"][skill_name]
+    installed_agents = installation["agents"]
+    installed_version = installation["version"]
+
+    primary_dir = project.primary_skills_dir / skill_name
+
+    # 4. Display removal summary
+    ui.info(f"\nRemoving skill: {skill_name} (v{installed_version})")
+    ui.info(f"  Primary: {primary_dir.relative_to(project.root)}/")
+
+    # Check if primary directory exists (might be dangling)
+    if not primary_dir.exists():
+        ui.warning("  Primary directory not found (may have been manually deleted)")
+
+    ui.info(f"  Agents: {', '.join(installed_agents)}")
+
+    # 5. Confirm with user
+    if not ui.confirm("\nProceed with removal?", default=False):
+        ui.info("Removal cancelled.")
+        raise SkillOperationError("User cancelled removal.")
+
+    # 6-8. Execute removal
+
+    # Step 1: Remove symlinks (including dangling ones)
+    agent_dirs = []
+    for agent in SUPPORTED_AGENTS:
+        if agent.id in installed_agents:
+            agent_dirs.append(agent.skills_dir)
+
+    removed_symlinks = []
+    try:
+        # Check for dangling symlinks and remove them manually if needed
+        for agent_dir in agent_dirs:
+            link_path = project.root / agent_dir / skill_name
+            if link_path.is_symlink():
+                try:
+                    link_path.unlink()
+                    removed_symlinks.append(link_path)
+                    ui.verbose(f"Removed symlink: {link_path}")
+                except OSError as e:
+                    ui.warning(f"Failed to remove symlink {link_path}: {e}")
+    except Exception as e:
+        raise SkillOperationError(
+            f"Failed to remove symlinks: {e}\nSome symlinks may remain."
+        ) from e
+
+    ui.verbose(f"Removed {len(removed_symlinks)} symlinks")
+
+    # Step 2: Remove primary directory (if it exists)
+    if primary_dir.exists():
+        try:
+            shutil.rmtree(primary_dir)
+            ui.verbose(f"Removed primary directory: {primary_dir}")
+        except OSError as e:
+            raise SkillOperationError(
+                f"Failed to remove primary directory: {e}\n"
+                f"Check file permissions and that no files are in use."
+            ) from e
+    else:
+        ui.verbose("Primary directory already removed")
+
+    # Step 3: Update config
+    try:
+        config = read_config(project.config_path)
+        if skill_name in config["installations"]:
+            del config["installations"][skill_name]
+            write_config(project.config_path, config)
+            ui.verbose("Updated configuration")
+    except Exception as e:
+        raise SkillOperationError(
+            f"Failed to update configuration: {e}\n"
+            f"The skill was removed but configuration tracking may be inconsistent."
+        ) from e
+
+    # 9. Display success message
+    ui.success(f"Removed {skill_name} (v{installed_version})")
+
+
 def list_skills(
     project: ProjectContext,
     repo: SkillsRepository,
