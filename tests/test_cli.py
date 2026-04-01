@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
@@ -40,13 +41,38 @@ class TestAddCommand:
         # Arrange: Create fake repository and config
         repo_dir = tmp_project / "repo"
         repo_dir.mkdir()
-        (repo_dir / ".git").mkdir()
+
+        # Initialize a real git repository
+        import subprocess
+
+        subprocess.run(["git", "init"], cwd=repo_dir, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@test.com"],
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test User"],
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
+        )
 
         skill_name = "test-skill"
         (repo_dir / skill_name).mkdir()
         (repo_dir / skill_name / "SKILL.md").write_text(
             f"---\nname: {skill_name}\ndescription: Test skill\nversion: 1.0.0\n---\n",
             encoding="utf-8",
+        )
+
+        # Create an initial commit
+        subprocess.run(["git", "add", "."], cwd=repo_dir, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", "Initial commit"],
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
         )
 
         project = ProjectContext(root=tmp_project)
@@ -553,13 +579,39 @@ class TestUpdateCommand:
         # Create a fake repo with an updated skill
         repo_dir = tmp_project / "repo"
         repo_dir.mkdir()
-        (repo_dir / ".git").mkdir()
+
+        # Initialize a real git repository
+        import subprocess
+
+        subprocess.run(["git", "init"], cwd=repo_dir, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@test.com"],
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test User"],
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
+        )
+
         skill_name = "skill-update"
         skill_dir = repo_dir / skill_name
         skill_dir.mkdir()
         (skill_dir / "SKILL.md").write_text(
             "---\nname: skill-update\ndescription: s\nversion: 2.0.0\n---\n",
             encoding="utf-8",
+        )
+
+        # Create an initial commit
+        subprocess.run(["git", "add", "."], cwd=repo_dir, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", "Initial commit"],
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
         )
 
         config = {
@@ -569,17 +621,21 @@ class TestUpdateCommand:
         }
         write_config(project.config_path, config)
 
-        # Run update command
-        original_cwd = None
-        try:
-            import os
+        # Mock sync_repository to avoid Git operations during test
+        with patch("myskills.skill_ops.sync_repository") as mock_sync:
+            mock_sync.return_value = None
 
-            original_cwd = os.getcwd()
-            os.chdir(tmp_project)
-            result = cli_runner.invoke(main, ["update"])
-        finally:
-            if original_cwd:
-                os.chdir(original_cwd)
+            # Run update command
+            original_cwd = None
+            try:
+                import os
+
+                original_cwd = os.getcwd()
+                os.chdir(tmp_project)
+                result = cli_runner.invoke(main, ["update"])
+            finally:
+                if original_cwd:
+                    os.chdir(original_cwd)
 
         assert result.exit_code == 0, f"Output: {result.output}\nException: {result.exception}"
         assert "Updated:" in result.output
@@ -826,7 +882,33 @@ class TestImportCommand:
 
         repo_dir = tmp_project / "repo"
         repo_dir.mkdir()
-        (repo_dir / ".git").mkdir()
+
+        # Initialize a real git repository
+        import subprocess
+
+        subprocess.run(["git", "init"], cwd=repo_dir, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@test.com"],
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test User"],
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
+        )
+
+        # Create an initial commit
+        (repo_dir / ".gitkeep").write_text("", encoding="utf-8")
+        subprocess.run(["git", "add", "."], cwd=repo_dir, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", "Initial commit"],
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
+        )
 
         project = ProjectContext(root=tmp_project)
         config = {
