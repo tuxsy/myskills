@@ -1,0 +1,85 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "myskills"
+version = "0.1.0"
+description = "CLI tool to manage AI agent skills from a private Git repository"
+readme = "PURPOSE.md"
+requires-python = ">=3.11"
+license = "MIT"
+keywords = ["cli", "ai", "skills", "agents"]
+
+dependencies = [
+    "click>=8.1,<9",
+    "dulwich[paramiko]>=0.22,<1",
+    "simple-term-menu>=1.6,<2",
+    "pyyaml>=6.0,<7",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.4",
+    "mypy>=1.10",
+    "pyinstaller>=6.0",
+]
+test = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "pytest-subprocess>=1.5",
+    "pytest-mock>=3.14",
+]
+
+[project.scripts]
+myskills = "myskills.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/myskills"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = [
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+]
+
+[tool.coverage.run]
+source = ["myskills"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[tool.ruff]
+target-version = "py311"
+line-length = 99
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "N",    # pep8-naming
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "TCH",  # flake8-type-checking
+    "RUF",  # ruff-specific rules
+]
+ignore = [
+    "E501",  # line length handled by formatter
+    "TC001", # move app import into TYPE_CHECKING — false positives with runtime usage
+    "TC003", # move stdlib import into TYPE_CHECKING — false positives with runtime usage
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["myskills"]
